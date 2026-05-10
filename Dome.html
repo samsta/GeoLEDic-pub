@@ -1,0 +1,1578 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+polygon {
+  stroke: black;
+}
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+#container {
+  display: flex;
+  height: 100vh;
+  align-items: flex-start;
+}
+#sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-width: 150px;
+}
+div#element_info {
+  width: 100%;
+}
+div#stats {
+  width: 100%;
+}
+
+/* In portrait the SVG fills the full width, so overlay the sidebar at the bottom */
+@media (orientation: portrait) {
+  #sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: auto;
+    max-height: 40vh;
+    background: rgba(255,255,255,0.9);
+  }
+}
+
+
+div#element_info > table {
+  display: flex;
+  background-color: lightgray;
+  flex-direction: column;
+  align-self: stretch;
+}
+table {
+  margin-bottom: 3px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.hub {
+  stroke: black;
+  stroke-width: 4px;
+}
+.powered-hub {
+  fill: firebrick;
+} 
+.unpowered-hub {
+  fill: gray;
+}
+.signal-wire {
+  stroke: green;
+  stroke-width: 2px;
+  fill: none;
+}
+.power-wire {
+  stroke: firebrick;
+  stroke-width: 2px;
+  fill: none;
+}
+.led-strip {
+  stroke: orange;
+  stroke-width: 3px;
+  stroke-dasharray: 3, 1;
+}
+.fat {
+  stroke-width: 8px;
+}
+.strip-start {
+  fill: green;
+  stroke: black;
+  stroke-width: 1px;
+}
+#strut_svg {
+  margin-top:10px;
+}
+#legend {
+  position: fixed;
+  left: 20px;
+  top: 20px;
+  transform-origin: top left;
+}
+#svg {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+}
+</style>
+</head>
+<body>
+<div id="container">
+  <svg id="svg" width="1300" height="1300" viewBox="0 0 1300 1300">
+  </svg>
+  <div id="legend">
+    <table>
+      <tr><td><svg width="30" height="25"><circle cx="15" cy="12.5" r="10" class="hub powered-hub"/></svg></td><td>Powered Hub</td></tr>
+      <tr><td><svg width="30" height="25"><circle cx="15" cy="12.5" r="10" class="hub unpowered-hub"/></svg></td><td>Unpowered Hub</td></tr>
+      <tr><td><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" class="signal-wire"/></svg></td><td>Signal Wire</td></tr>
+      <tr><td><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" class="power-wire"/></svg></td><td>Power Wire</td></tr>
+      <tr><td><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" class="led-strip"/></svg></td><td>LED Strip</td></tr>
+      <tr><td><svg width="30" height="10"><circle cx="15" cy="5" r="4" class="strip-start"/></svg></td><td>Strip Start</td></tr>
+      <tr><td><input type="checkbox" id="toggle-triangle-opacity"></td><td>Triangle Background</td></tr>
+      <tr><td><input type="checkbox" id="toggle-debug-info"></td><td>Debug Info</td></tr>
+    </table>
+  </div>
+  <div id="sidebar">
+    <div id="stats"></div>
+    <div id="element_info"></div>
+  </div>
+</div>
+<script>
+
+//< DOMEDATA
+triangles = [{"id": 0, "vertices": [[-0.0, 0.0, 6.0], [0.975, 1.658, 5.683], [-0.974, 1.658, 5.683]], "no_leds": true, "edges": [{"length": 0, "type": "none", "leds": 0}, {"length": 0, "type": "none", "leds": 0}, {"length": 0, "type": "none", "leds": 0}]},
+{"id": 1, "vertices": [[-0.927, 0.0, 5.853], [-0.974, 1.658, 5.683], [-1.854, 0.0, 5.706]], "alt_strut": [[-1.854, 0.0, 5.706], [-0.0, 0.0, 6.0]], "edges": [{"length": 1.4903550911548504, "type": "other_45", "leds": 45, "first_led": 431, "last_led": 475}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 476, "last_led": 526}, {"length": 0.7615829744886702, "type": "other_23", "leds": 23, "first_led": 527, "last_led": 549}], "strip": 0},
+{"id": 2, "vertices": [[-2.728, 1.658, 5.08], [-1.854, 0.0, 5.706], [-0.974, 1.658, 5.683]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 668, "last_led": 721}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 722, "last_led": 772}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 773, "last_led": 823}], "strip": 1},
+{"id": 3, "vertices": [[-2.728, 1.658, 5.08], [-3.527, 0.0, 4.854], [-1.854, 0.0, 5.706]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 1},
+{"id": 4, "vertices": [[-2.728, 1.658, 5.08], [-3.988, 1.658, 4.164], [-3.527, 0.0, 4.854]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 1},
+{"id": 5, "vertices": [[-4.854, 0.0, 3.526], [-3.527, 0.0, 4.854], [-3.988, 1.658, 4.164]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 102, "last_led": 155}], "strip": 2},
+{"id": 6, "vertices": [[-4.854, 0.0, 3.526], [-3.988, 1.658, 4.164], [-5.103, 1.658, 2.683]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 156, "last_led": 209}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 210, "last_led": 260}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 261, "last_led": 311}], "strip": 2},
+{"id": 7, "vertices": [[-4.854, 0.0, 3.526], [-5.103, 1.658, 2.683], [-5.706, 0.0, 1.854]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 312, "last_led": 362}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 363, "last_led": 416}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 735, "last_led": 785}], "strip": 2},
+{"id": 8, "vertices": [[-5.706, 0.0, 1.854], [-5.103, 1.658, 2.683], [-5.706, 1.658, 0.829]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 417, "last_led": 470}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 471, "last_led": 524}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 525, "last_led": 578}], "strip": 2},
+{"id": 9, "vertices": [[-5.706, 0.0, 1.854], [-5.706, 1.658, 0.829], [-6.0, 0.0, 0.0]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 579, "last_led": 632}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 633, "last_led": 683}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 684, "last_led": 734}], "strip": 2},
+{"id": 10, "vertices": [[-5.674, 1.658, -1.025], [-6.0, 0.0, 0.0], [-5.706, 1.658, 0.829]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 668, "last_led": 721}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 722, "last_led": 772}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 773, "last_led": 823}], "strip": 3},
+{"id": 11, "vertices": [[-5.674, 1.658, -1.025], [-5.706, 0.0, -1.854], [-6.0, 0.0, 0.0]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 3},
+{"id": 12, "vertices": [[-5.674, 1.658, -1.025], [-5.193, 1.658, -2.506], [-5.706, 0.0, -1.854]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 3},
+{"id": 13, "vertices": [[-4.854, 0.0, -3.526], [-5.706, 0.0, -1.854], [-5.193, 1.658, -2.506]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 102, "last_led": 155}], "strip": 4},
+{"id": 14, "vertices": [[-4.854, 0.0, -3.526], [-5.193, 1.658, -2.506], [-4.129, 1.658, -4.025]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 156, "last_led": 209}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 210, "last_led": 260}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 261, "last_led": 311}], "strip": 4},
+{"id": 15, "vertices": [[-4.854, 0.0, -3.526], [-4.129, 1.658, -4.025], [-3.526, 0.0, -4.854]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 312, "last_led": 362}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 363, "last_led": 416}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 735, "last_led": 785}], "strip": 4},
+{"id": 16, "vertices": [[-3.526, 0.0, -4.854], [-4.129, 1.658, -4.025], [-2.552, 1.658, -5.17]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 417, "last_led": 470}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 471, "last_led": 524}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 525, "last_led": 578}], "strip": 4},
+{"id": 17, "vertices": [[-3.526, 0.0, -4.854], [-2.552, 1.658, -5.17], [-1.854, 0.0, -5.706]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 579, "last_led": 632}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 633, "last_led": 683}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 684, "last_led": 734}], "strip": 4},
+{"id": 18, "vertices": [[-0.779, 1.658, -5.713], [-1.854, 0.0, -5.706], [-2.552, 1.658, -5.17]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 126, "last_led": 179}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 180, "last_led": 230}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 231, "last_led": 281}], "strip": 5},
+{"id": 19, "vertices": [[-0.779, 1.658, -5.713], [-0.8, 0.0, -5.873], [-1.854, 0.0, -5.706]], "alt_strut": [[-0.0, 0.0, -6.0], [-1.854, 0.0, -5.706]], "edges": [{"length": 1.4888346256456548, "type": "other_45", "leds": 45, "first_led": 0, "last_led": 44}, {"length": 0.890148068451609, "type": "other_27", "leds": 27, "first_led": 45, "last_led": 71}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 72, "last_led": 125}], "strip": 5},
+{"id": 20, "vertices": [[-0.0, 0.0, -6.0], [-0.779, 1.658, -5.713], [0.779, 1.658, -5.713]], "no_leds": true, "edges": [{"length": 0, "type": "none", "leds": 0}, {"length": 0, "type": "none", "leds": 0}, {"length": 0, "type": "none", "leds": 0}]},
+{"id": 21, "vertices": [[1.854, 0.0, -5.706], [0.8, 0.0, -5.873], [0.779, 1.658, -5.713]], "alt_strut": [[1.854, 0.0, -5.706], [-0.0, 0.0, -6.0]], "edges": [{"length": 0.890148068451609, "type": "other_27", "leds": 27, "first_led": 0, "last_led": 26}, {"length": 1.4888346256456548, "type": "other_45", "leds": 45, "first_led": 27, "last_led": 71}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 72, "last_led": 125}], "strip": 6},
+{"id": 22, "vertices": [[1.854, 0.0, -5.706], [0.779, 1.658, -5.713], [2.552, 1.658, -5.17]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 126, "last_led": 179}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 180, "last_led": 230}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 231, "last_led": 281}], "strip": 6},
+{"id": 23, "vertices": [[1.854, 0.0, -5.706], [2.552, 1.658, -5.17], [3.526, 0.0, -4.854]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 282, "last_led": 332}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 333, "last_led": 386}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 705, "last_led": 755}], "strip": 6},
+{"id": 24, "vertices": [[3.526, 0.0, -4.854], [2.552, 1.658, -5.17], [4.129, 1.658, -4.025]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 387, "last_led": 440}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 441, "last_led": 494}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 495, "last_led": 548}], "strip": 6},
+{"id": 25, "vertices": [[3.526, 0.0, -4.854], [4.129, 1.658, -4.025], [4.854, 0.0, -3.526]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 549, "last_led": 602}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 603, "last_led": 653}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 654, "last_led": 704}], "strip": 6},
+{"id": 26, "vertices": [[5.193, 1.658, -2.506], [4.854, 0.0, -3.526], [4.129, 1.658, -4.025]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 668, "last_led": 721}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 722, "last_led": 772}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 773, "last_led": 823}], "strip": 7},
+{"id": 27, "vertices": [[5.193, 1.658, -2.506], [5.706, 0.0, -1.854], [4.854, 0.0, -3.526]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 7},
+{"id": 28, "vertices": [[5.193, 1.658, -2.506], [5.674, 1.658, -1.025], [5.706, 0.0, -1.854]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 7},
+{"id": 29, "vertices": [[6.0, 0.0, 0.0], [5.706, 0.0, -1.854], [5.674, 1.658, -1.025]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 102, "last_led": 155}], "strip": 8},
+{"id": 30, "vertices": [[6.0, 0.0, 0.0], [5.674, 1.658, -1.025], [5.706, 1.658, 0.829]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 156, "last_led": 209}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 210, "last_led": 260}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 261, "last_led": 311}], "strip": 8},
+{"id": 31, "vertices": [[6.0, 0.0, 0.0], [5.706, 1.658, 0.829], [5.706, 0.0, 1.854]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 312, "last_led": 362}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 363, "last_led": 416}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 735, "last_led": 785}], "strip": 8},
+{"id": 32, "vertices": [[5.706, 0.0, 1.854], [5.706, 1.658, 0.829], [5.103, 1.658, 2.683]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 417, "last_led": 470}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 471, "last_led": 524}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 525, "last_led": 578}], "strip": 8},
+{"id": 33, "vertices": [[5.706, 0.0, 1.854], [5.103, 1.658, 2.683], [4.854, 0.0, 3.527]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 579, "last_led": 632}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 633, "last_led": 683}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 684, "last_led": 734}], "strip": 8},
+{"id": 34, "vertices": [[3.988, 1.658, 4.164], [4.854, 0.0, 3.527], [5.103, 1.658, 2.683]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 668, "last_led": 721}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 722, "last_led": 772}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 773, "last_led": 823}], "strip": 9},
+{"id": 35, "vertices": [[3.988, 1.658, 4.164], [3.526, 0.0, 4.854], [4.854, 0.0, 3.527]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 9},
+{"id": 36, "vertices": [[3.988, 1.658, 4.164], [2.728, 1.658, 5.08], [3.526, 0.0, 4.854]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 9},
+{"id": 37, "vertices": [[1.854, 0.0, 5.706], [3.526, 0.0, 4.854], [2.728, 1.658, 5.08]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 102, "last_led": 155}], "strip": 0},
+{"id": 38, "vertices": [[1.854, 0.0, 5.706], [2.728, 1.658, 5.08], [0.975, 1.658, 5.683]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 156, "last_led": 209}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 210, "last_led": 260}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 261, "last_led": 311}], "strip": 0},
+{"id": 39, "vertices": [[1.854, 0.0, 5.706], [0.975, 1.658, 5.683], [0.927, 0.0, 5.853]], "alt_strut": [[-0.0, 0.0, 6.0], [1.854, 0.0, 5.706]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 312, "last_led": 362}, {"length": 1.490383579144283, "type": "other_45", "leds": 45, "first_led": 363, "last_led": 407}, {"length": 0.7615829744886702, "type": "other_23", "leds": 23, "first_led": 408, "last_led": 430}], "strip": 0},
+{"id": 40, "vertices": [[0.0, 3.154, 5.104], [-0.687, 2.1, 5.512], [0.687, 2.1, 5.512]], "shortened_strips": [0, 2], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 468, "last_led": 502}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 503, "last_led": 537}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 538, "last_led": 572}], "strip": 10},
+{"id": 41, "vertices": [[0.0, 3.154, 5.104], [-1.95, 2.983, 4.827], [-0.974, 1.658, 5.683]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 312, "last_led": 365}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 366, "last_led": 416}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 417, "last_led": 467}], "strip": 10},
+{"id": 42, "vertices": [[-2.728, 1.658, 5.08], [-0.974, 1.658, 5.683], [-1.95, 2.983, 4.827]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 1},
+{"id": 43, "vertices": [[-2.728, 1.658, 5.08], [-1.95, 2.983, 4.827], [-3.154, 2.683, 4.341]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 1},
+{"id": 44, "vertices": [[-2.728, 1.658, 5.08], [-3.154, 2.683, 4.341], [-3.988, 1.658, 4.164]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 1},
+{"id": 45, "vertices": [[-3.988, 2.983, 3.345], [-3.988, 1.658, 4.164], [-3.154, 2.683, 4.341]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 12},
+{"id": 46, "vertices": [[-3.988, 2.983, 3.345], [-5.103, 1.658, 2.683], [-3.988, 1.658, 4.164]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 12},
+{"id": 47, "vertices": [[-4.854, 3.154, 1.577], [-5.103, 1.658, 2.683], [-3.988, 2.983, 3.345]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 624, "last_led": 674}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 675, "last_led": 725}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 726, "last_led": 779}], "strip": 13},
+{"id": 48, "vertices": [[-4.854, 3.154, 1.577], [-5.706, 1.658, 0.829], [-5.103, 1.658, 2.683]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 468, "last_led": 518}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 519, "last_led": 572}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 573, "last_led": 623}], "strip": 13},
+{"id": 49, "vertices": [[-4.854, 3.154, 1.577], [-5.193, 2.983, -0.362], [-5.706, 1.658, 0.829]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 312, "last_led": 365}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 366, "last_led": 416}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 417, "last_led": 467}], "strip": 13},
+{"id": 50, "vertices": [[-5.674, 1.658, -1.025], [-5.706, 1.658, 0.829], [-5.193, 2.983, -0.362]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 3},
+{"id": 51, "vertices": [[-5.674, 1.658, -1.025], [-5.193, 2.983, -0.362], [-5.103, 2.683, -1.658]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 3},
+{"id": 52, "vertices": [[-5.674, 1.658, -1.025], [-5.103, 2.683, -1.658], [-5.193, 1.658, -2.506]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 3},
+{"id": 53, "vertices": [[-4.414, 2.983, -2.759], [-5.193, 1.658, -2.506], [-5.103, 2.683, -1.658]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 15},
+{"id": 54, "vertices": [[-4.414, 2.983, -2.759], [-4.129, 1.658, -4.025], [-5.193, 1.658, -2.506]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 15},
+{"id": 55, "vertices": [[-3.0, 3.154, -4.129], [-4.129, 1.658, -4.025], [-4.414, 2.983, -2.759]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 624, "last_led": 674}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 675, "last_led": 725}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 726, "last_led": 779}], "strip": 16},
+{"id": 56, "vertices": [[-3.0, 3.154, -4.129], [-2.552, 1.658, -5.17], [-4.129, 1.658, -4.025]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 468, "last_led": 518}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 519, "last_led": 572}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 573, "last_led": 623}], "strip": 16},
+{"id": 57, "vertices": [[-3.0, 3.154, -4.129], [-1.26, 2.983, -5.051], [-2.552, 1.658, -5.17]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 312, "last_led": 365}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 366, "last_led": 416}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 417, "last_led": 467}], "strip": 16},
+{"id": 58, "vertices": [[-0.779, 1.658, -5.713], [-2.552, 1.658, -5.17], [-1.26, 2.983, -5.051]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 282, "last_led": 332}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 333, "last_led": 383}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 384, "last_led": 425}], "strip": 5},
+{"id": 59, "vertices": [[-0.779, 1.658, -5.713], [-1.26, 2.983, -5.051], [-0.0, 2.683, -5.366]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 426, "last_led": 467}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 468, "last_led": 502}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 503, "last_led": 537}], "strip": 5},
+{"id": 60, "vertices": [[-0.438, 2.1, -5.558], [-0.0, 2.683, -5.366], [0.438, 2.1, -5.558]], "shortened_strips": [0, 1], "edges": [{"length": 0.5770537116147627, "type": "other_18", "leds": 18, "first_led": 538, "last_led": 555}, {"length": 0.5770537116147627, "type": "other_18", "leds": 18, "first_led": 556, "last_led": 573}, {"length": 0.6990000000000001, "type": "other_21", "leds": 21, "first_led": 574, "last_led": 594}], "strip": 5},
+{"id": 61, "vertices": [[1.26, 2.983, -5.051], [0.779, 1.658, -5.713], [-0.0, 2.683, -5.366]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 18},
+{"id": 62, "vertices": [[1.26, 2.983, -5.051], [2.552, 1.658, -5.17], [0.779, 1.658, -5.713]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 18},
+{"id": 63, "vertices": [[3.0, 3.154, -4.129], [2.552, 1.658, -5.17], [1.26, 2.983, -5.051]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 624, "last_led": 674}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 675, "last_led": 725}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 726, "last_led": 779}], "strip": 19},
+{"id": 64, "vertices": [[3.0, 3.154, -4.129], [4.129, 1.658, -4.025], [2.552, 1.658, -5.17]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 468, "last_led": 518}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 519, "last_led": 572}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 573, "last_led": 623}], "strip": 19},
+{"id": 65, "vertices": [[3.0, 3.154, -4.129], [4.414, 2.983, -2.759], [4.129, 1.658, -4.025]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 312, "last_led": 365}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 366, "last_led": 416}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 417, "last_led": 467}], "strip": 19},
+{"id": 66, "vertices": [[5.193, 1.658, -2.506], [4.129, 1.658, -4.025], [4.414, 2.983, -2.759]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 7},
+{"id": 67, "vertices": [[5.193, 1.658, -2.506], [4.414, 2.983, -2.759], [5.103, 2.683, -1.658]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 7},
+{"id": 68, "vertices": [[5.193, 1.658, -2.506], [5.103, 2.683, -1.658], [5.674, 1.658, -1.025]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 7},
+{"id": 69, "vertices": [[5.193, 2.983, -0.362], [5.674, 1.658, -1.025], [5.103, 2.683, -1.658]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 21},
+{"id": 70, "vertices": [[5.193, 2.983, -0.362], [5.706, 1.658, 0.829], [5.674, 1.658, -1.025]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 21},
+{"id": 71, "vertices": [[4.854, 3.154, 1.577], [5.706, 1.658, 0.829], [5.193, 2.983, -0.362]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 624, "last_led": 674}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 675, "last_led": 725}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 726, "last_led": 779}], "strip": 22},
+{"id": 72, "vertices": [[4.854, 3.154, 1.577], [5.103, 1.658, 2.683], [5.706, 1.658, 0.829]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 468, "last_led": 518}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 519, "last_led": 572}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 573, "last_led": 623}], "strip": 22},
+{"id": 73, "vertices": [[4.854, 3.154, 1.577], [3.988, 2.983, 3.345], [5.103, 1.658, 2.683]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 312, "last_led": 365}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 366, "last_led": 416}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 417, "last_led": 467}], "strip": 22},
+{"id": 74, "vertices": [[3.988, 1.658, 4.164], [5.103, 1.658, 2.683], [3.988, 2.983, 3.345]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 9},
+{"id": 75, "vertices": [[3.988, 1.658, 4.164], [3.988, 2.983, 3.345], [3.154, 2.683, 4.341]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 9},
+{"id": 76, "vertices": [[3.988, 1.658, 4.164], [3.154, 2.683, 4.341], [2.728, 1.658, 5.08]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 9},
+{"id": 77, "vertices": [[1.949, 2.983, 4.827], [2.728, 1.658, 5.08], [3.154, 2.683, 4.341]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 144, "last_led": 185}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 186, "last_led": 220}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 221, "last_led": 255}], "strip": 24},
+{"id": 78, "vertices": [[1.949, 2.983, 4.827], [0.975, 1.658, 5.683], [2.728, 1.658, 5.08]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 51, "last_led": 101}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 102, "last_led": 143}], "strip": 24},
+{"id": 79, "vertices": [[0.0, 3.154, 5.104], [0.975, 1.658, 5.683], [1.949, 2.983, 4.827]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 573, "last_led": 623}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 624, "last_led": 674}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 675, "last_led": 728}], "strip": 10},
+{"id": 80, "vertices": [[0.0, 3.154, 5.104], [0.975, 4.341, 4.025], [-0.975, 4.341, 4.025]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 10},
+{"id": 81, "vertices": [[0.0, 3.154, 5.104], [-0.975, 4.341, 4.025], [-1.95, 2.983, 4.827]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 207, "last_led": 257}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 258, "last_led": 311}], "strip": 10},
+{"id": 82, "vertices": [[-2.728, 3.802, 3.755], [-1.95, 2.983, 4.827], [-0.975, 4.341, 4.025]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 112, "last_led": 153}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 154, "last_led": 204}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 205, "last_led": 255}], "strip": 11},
+{"id": 83, "vertices": [[-2.728, 3.802, 3.755], [-3.154, 2.683, 4.341], [-1.95, 2.983, 4.827]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 0, "last_led": 34}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 35, "last_led": 69}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 70, "last_led": 111}], "strip": 11},
+{"id": 84, "vertices": [[-3.988, 2.983, 3.342], [-3.154, 2.683, 4.341], [-2.728, 3.802, 3.755]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 12},
+{"id": 85, "vertices": [[-3.988, 2.983, 3.342], [-2.728, 3.802, 3.755], [-3.526, 4.341, 2.171]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 12},
+{"id": 86, "vertices": [[-3.988, 2.983, 3.342], [-3.526, 4.341, 2.171], [-4.854, 3.154, 1.577]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 12},
+{"id": 87, "vertices": [[-4.854, 3.154, 1.577], [-3.526, 4.341, 2.171], [-4.129, 4.341, 0.317]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 13},
+{"id": 88, "vertices": [[-4.854, 3.154, 1.577], [-4.129, 4.341, 0.317], [-5.193, 2.983, -0.362]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 207, "last_led": 257}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 258, "last_led": 311}], "strip": 13},
+{"id": 89, "vertices": [[-4.414, 3.802, -1.434], [-5.193, 2.983, -0.362], [-4.129, 4.341, 0.317]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 112, "last_led": 153}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 154, "last_led": 204}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 205, "last_led": 255}], "strip": 14},
+{"id": 90, "vertices": [[-4.414, 3.802, -1.434], [-5.103, 2.683, -1.658], [-5.193, 2.983, -0.362]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 0, "last_led": 34}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 35, "last_led": 69}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 70, "last_led": 111}], "strip": 14},
+{"id": 91, "vertices": [[-4.414, 2.983, -2.759], [-5.103, 2.683, -1.658], [-4.414, 3.802, -1.434]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 15},
+{"id": 92, "vertices": [[-4.414, 2.983, -2.759], [-4.414, 3.802, -1.434], [-3.154, 4.341, -2.683]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 15},
+{"id": 93, "vertices": [[-4.414, 2.983, -2.759], [-3.154, 4.341, -2.683], [-3.0, 3.154, -4.129]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 15},
+{"id": 94, "vertices": [[-3.0, 3.154, -4.129], [-3.154, 4.341, -2.683], [-1.577, 4.341, -3.829]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 16},
+{"id": 95, "vertices": [[-3.0, 3.154, -4.129], [-1.577, 4.341, -3.829], [-1.26, 2.983, -5.051]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 207, "last_led": 257}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 258, "last_led": 311}], "strip": 16},
+{"id": 96, "vertices": [[-0.0, 3.802, -4.641], [-1.26, 2.983, -5.051], [-1.577, 4.341, -3.829]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 112, "last_led": 153}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 154, "last_led": 204}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 205, "last_led": 255}], "strip": 17},
+{"id": 97, "vertices": [[-0.0, 3.802, -4.641], [-0.0, 2.683, -5.366], [-1.26, 2.983, -5.051]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 0, "last_led": 34}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 35, "last_led": 69}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 70, "last_led": 111}], "strip": 17},
+{"id": 98, "vertices": [[1.26, 2.983, -5.051], [0.0, 2.683, -5.366], [0.0, 3.802, -4.641]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 18},
+{"id": 99, "vertices": [[1.26, 2.983, -5.051], [0.0, 3.802, -4.641], [1.577, 4.341, -3.829]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 18},
+{"id": 100, "vertices": [[1.26, 2.983, -5.051], [1.577, 4.341, -3.829], [3.0, 3.154, -4.129]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 18},
+{"id": 101, "vertices": [[3.0, 3.154, -4.129], [1.577, 4.341, -3.829], [3.154, 4.341, -2.683]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 19},
+{"id": 102, "vertices": [[3.0, 3.154, -4.129], [3.154, 4.341, -2.683], [4.414, 2.983, -2.759]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 207, "last_led": 257}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 258, "last_led": 311}], "strip": 19},
+{"id": 103, "vertices": [[4.414, 3.802, -1.434], [4.414, 2.983, -2.759], [3.154, 4.341, -2.683]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 112, "last_led": 153}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 154, "last_led": 204}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 205, "last_led": 255}], "strip": 20},
+{"id": 104, "vertices": [[4.414, 3.802, -1.434], [5.103, 2.683, -1.658], [4.414, 2.983, -2.759]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 0, "last_led": 34}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 35, "last_led": 69}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 70, "last_led": 111}], "strip": 20},
+{"id": 105, "vertices": [[5.193, 2.983, -0.362], [5.103, 2.683, -1.658], [4.414, 3.802, -1.434]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 21},
+{"id": 106, "vertices": [[5.193, 2.983, -0.362], [4.414, 3.802, -1.434], [4.129, 4.341, 0.317]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 21},
+{"id": 107, "vertices": [[5.193, 2.983, -0.362], [4.129, 4.341, 0.317], [4.854, 3.154, 1.577]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 21},
+{"id": 108, "vertices": [[4.854, 3.154, 1.577], [4.129, 4.341, 0.317], [3.526, 4.341, 2.171]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 22},
+{"id": 109, "vertices": [[4.854, 3.154, 1.577], [3.526, 4.341, 2.171], [3.988, 2.983, 3.342]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 207, "last_led": 257}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 258, "last_led": 311}], "strip": 22},
+{"id": 110, "vertices": [[2.728, 3.802, 3.755], [3.988, 2.983, 3.342], [3.526, 4.341, 2.171]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 112, "last_led": 153}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 154, "last_led": 204}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 205, "last_led": 255}], "strip": 23},
+{"id": 111, "vertices": [[2.728, 3.802, 3.755], [3.154, 2.683, 4.341], [3.988, 2.983, 3.342]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 0, "last_led": 34}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 35, "last_led": 69}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 70, "last_led": 111}], "strip": 23},
+{"id": 112, "vertices": [[1.949, 2.983, 4.827], [3.154, 2.683, 4.341], [2.728, 3.802, 3.755]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 256, "last_led": 290}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 291, "last_led": 325}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 326, "last_led": 367}], "strip": 24},
+{"id": 113, "vertices": [[1.949, 2.983, 4.827], [2.728, 3.802, 3.755], [0.975, 4.341, 4.025]], "edges": [{"length": 1.38, "type": "B", "leds": 42, "first_led": 368, "last_led": 409}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 410, "last_led": 460}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 461, "last_led": 511}], "strip": 24},
+{"id": 114, "vertices": [[1.949, 2.983, 4.827], [0.975, 4.341, 4.025], [0.0, 3.154, 5.104]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 512, "last_led": 562}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 563, "last_led": 613}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 614, "last_led": 667}], "strip": 24},
+{"id": 115, "vertices": [[-0.0, 5.366, 2.683], [-0.975, 4.341, 4.025], [0.975, 4.341, 4.025]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 612, "last_led": 665}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 666, "last_led": 719}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 720, "last_led": 773}], "strip": 29},
+{"id": 116, "vertices": [[-0.0, 5.366, 2.683], [-1.854, 5.103, 2.552], [-0.975, 4.341, 4.025]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 456, "last_led": 506}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 507, "last_led": 557}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 558, "last_led": 611}], "strip": 29},
+{"id": 117, "vertices": [[-2.728, 3.802, 3.755], [-0.975, 4.341, 4.025], [-1.854, 5.103, 2.552]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 256, "last_led": 306}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 307, "last_led": 357}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 358, "last_led": 411}], "strip": 11},
+{"id": 118, "vertices": [[-2.728, 3.802, 3.755], [-1.854, 5.103, 2.552], [-3.526, 4.341, 2.171]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 412, "last_led": 465}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 466, "last_led": 516}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 517, "last_led": 567}], "strip": 11},
+{"id": 119, "vertices": [[-2.552, 5.366, 0.829], [-3.526, 4.341, 2.171], [-1.854, 5.103, 2.552]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 774, "last_led": 827}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 828, "last_led": 878}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 879, "last_led": 929}], "strip": 25},
+{"id": 120, "vertices": [[-2.552, 5.366, 0.829], [-4.129, 4.341, 0.317], [-3.526, 4.341, 2.171]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 612, "last_led": 665}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 666, "last_led": 719}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 720, "last_led": 773}], "strip": 25},
+{"id": 121, "vertices": [[-2.552, 5.366, 0.829], [-3.0, 5.103, -0.975], [-4.129, 4.341, 0.317]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 456, "last_led": 506}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 507, "last_led": 557}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 558, "last_led": 611}], "strip": 25},
+{"id": 122, "vertices": [[-4.414, 3.802, -1.434], [-4.129, 4.341, 0.317], [-3.0, 5.103, -0.975]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 256, "last_led": 306}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 307, "last_led": 357}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 358, "last_led": 411}], "strip": 14},
+{"id": 123, "vertices": [[-4.414, 3.802, -1.434], [-3.0, 5.103, -0.975], [-3.154, 4.341, -2.683]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 412, "last_led": 465}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 466, "last_led": 516}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 517, "last_led": 567}], "strip": 14},
+{"id": 124, "vertices": [[-1.577, 5.366, -2.171], [-3.154, 4.341, -2.683], [-3.0, 5.103, -0.975]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 774, "last_led": 827}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 828, "last_led": 878}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 879, "last_led": 929}], "strip": 26},
+{"id": 125, "vertices": [[-1.577, 5.366, -2.171], [-1.577, 4.341, -3.829], [-3.154, 4.341, -2.683]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 612, "last_led": 665}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 666, "last_led": 719}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 720, "last_led": 773}], "strip": 26},
+{"id": 126, "vertices": [[-1.577, 5.366, -2.171], [-0.0, 5.103, -3.154], [-1.577, 4.341, -3.829]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 456, "last_led": 506}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 507, "last_led": 557}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 558, "last_led": 611}], "strip": 26},
+{"id": 127, "vertices": [[-0.0, 3.802, -4.641], [-1.577, 4.341, -3.829], [-0.0, 5.103, -3.154]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 256, "last_led": 306}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 307, "last_led": 357}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 358, "last_led": 411}], "strip": 17},
+{"id": 128, "vertices": [[0.0, 3.802, -4.641], [0.0, 5.103, -3.154], [1.577, 4.341, -3.829]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 412, "last_led": 465}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 466, "last_led": 516}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 517, "last_led": 567}], "strip": 17},
+{"id": 129, "vertices": [[1.577, 5.366, -2.171], [1.577, 4.341, -3.829], [0.0, 5.103, -3.154]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 774, "last_led": 827}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 828, "last_led": 878}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 879, "last_led": 929}], "strip": 27},
+{"id": 130, "vertices": [[1.577, 5.366, -2.171], [3.154, 4.341, -2.683], [1.577, 4.341, -3.829]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 612, "last_led": 665}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 666, "last_led": 719}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 720, "last_led": 773}], "strip": 27},
+{"id": 131, "vertices": [[1.577, 5.366, -2.171], [3.0, 5.103, -0.975], [3.154, 4.341, -2.683]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 456, "last_led": 506}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 507, "last_led": 557}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 558, "last_led": 611}], "strip": 27},
+{"id": 132, "vertices": [[4.414, 3.802, -1.434], [3.154, 4.341, -2.683], [3.0, 5.103, -0.975]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 256, "last_led": 306}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 307, "last_led": 357}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 358, "last_led": 411}], "strip": 20},
+{"id": 133, "vertices": [[4.414, 3.802, -1.434], [3.0, 5.103, -0.975], [4.129, 4.341, 0.317]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 412, "last_led": 465}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 466, "last_led": 516}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 517, "last_led": 567}], "strip": 20},
+{"id": 134, "vertices": [[2.552, 5.366, 0.829], [4.129, 4.341, 0.317], [3.0, 5.103, -0.975]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 774, "last_led": 827}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 828, "last_led": 878}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 879, "last_led": 929}], "strip": 28},
+{"id": 135, "vertices": [[2.552, 5.366, 0.829], [3.526, 4.341, 2.171], [4.129, 4.341, 0.317]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 612, "last_led": 665}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 666, "last_led": 719}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 720, "last_led": 773}], "strip": 28},
+{"id": 136, "vertices": [[2.552, 5.366, 0.829], [1.854, 5.103, 2.552], [3.526, 4.341, 2.171]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 456, "last_led": 506}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 507, "last_led": 557}, {"length": 1.772, "type": "E", "leds": 54, "first_led": 558, "last_led": 611}], "strip": 28},
+{"id": 137, "vertices": [[2.728, 3.802, 3.755], [3.526, 4.341, 2.171], [1.854, 5.103, 2.552]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 256, "last_led": 306}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 307, "last_led": 357}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 358, "last_led": 411}], "strip": 23},
+{"id": 138, "vertices": [[2.728, 3.802, 3.755], [1.854, 5.103, 2.552], [0.975, 4.341, 4.025]], "edges": [{"length": 1.799, "type": "F", "leds": 54, "first_led": 412, "last_led": 465}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 466, "last_led": 516}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 517, "last_led": 567}], "strip": 23},
+{"id": 139, "vertices": [[-0.0, 5.366, 2.683], [0.975, 4.341, 4.025], [1.854, 5.103, 2.552]], "edges": [{"length": 1.772, "type": "E", "leds": 54, "first_led": 774, "last_led": 827}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 828, "last_led": 878}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 879, "last_led": 929}], "strip": 29},
+{"id": 140, "vertices": [[-0.0, 5.366, 2.683], [0.779, 5.851, 1.072], [-0.779, 5.851, 1.072]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 207, "last_led": 248}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 249, "last_led": 299}], "strip": 29},
+{"id": 141, "vertices": [[-0.0, 5.366, 2.683], [-0.779, 5.851, 1.072], [-1.854, 5.103, 2.552]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 300, "last_led": 350}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 351, "last_led": 404}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 405, "last_led": 455}], "strip": 29},
+{"id": 142, "vertices": [[-2.552, 5.366, 0.829], [-1.854, 5.103, 2.552], [-0.779, 5.851, 1.072]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 25},
+{"id": 143, "vertices": [[-2.552, 5.366, 0.829], [-0.779, 5.851, 1.072], [-1.26, 5.851, -0.409]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 207, "last_led": 248}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 249, "last_led": 299}], "strip": 25},
+{"id": 144, "vertices": [[-2.552, 5.366, 0.829], [-1.26, 5.851, -0.409], [-3.0, 5.103, -0.975]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 300, "last_led": 350}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 351, "last_led": 404}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 405, "last_led": 455}], "strip": 25},
+{"id": 145, "vertices": [[-1.577, 5.366, -2.171], [-3.0, 5.103, -0.975], [-1.26, 5.851, -0.409]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 26},
+{"id": 146, "vertices": [[-1.577, 5.366, -2.171], [-1.26, 5.851, -0.409], [-0.0, 5.851, -1.325]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 207, "last_led": 248}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 249, "last_led": 299}], "strip": 26},
+{"id": 147, "vertices": [[-1.577, 5.366, -2.171], [-0.0, 5.851, -1.325], [-0.0, 5.103, -3.154]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 300, "last_led": 350}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 351, "last_led": 404}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 405, "last_led": 455}], "strip": 26},
+{"id": 148, "vertices": [[1.577, 5.366, -2.171], [-0.0, 5.103, -3.154], [-0.0, 5.851, -1.325]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 27},
+{"id": 149, "vertices": [[1.577, 5.366, -2.171], [-0.0, 5.851, -1.325], [1.26, 5.851, -0.409]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 207, "last_led": 248}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 249, "last_led": 299}], "strip": 27},
+{"id": 150, "vertices": [[1.577, 5.366, -2.171], [1.26, 5.851, -0.409], [3.0, 5.103, -0.975]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 300, "last_led": 350}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 351, "last_led": 404}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 405, "last_led": 455}], "strip": 27},
+{"id": 151, "vertices": [[2.552, 5.366, 0.829], [3.0, 5.103, -0.975], [1.26, 5.851, -0.409]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 28},
+{"id": 152, "vertices": [[2.552, 5.366, 0.829], [1.26, 5.851, -0.409], [0.779, 5.851, 1.072]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 156, "last_led": 206}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 207, "last_led": 248}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 249, "last_led": 299}], "strip": 28},
+{"id": 153, "vertices": [[2.552, 5.366, 0.829], [0.779, 5.851, 1.072], [1.854, 5.103, 2.552]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 300, "last_led": 350}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 351, "last_led": 404}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 405, "last_led": 455}], "strip": 28},
+{"id": 154, "vertices": [[-0.0, 5.366, 2.683], [1.854, 5.103, 2.552], [0.779, 5.851, 1.072]], "edges": [{"length": 1.7, "type": "D", "leds": 51, "first_led": 0, "last_led": 50}, {"length": 1.799, "type": "F", "leds": 54, "first_led": 51, "last_led": 104}, {"length": 1.7, "type": "D", "leds": 51, "first_led": 105, "last_led": 155}], "strip": 29},
+{"id": 155, "vertices": [[-0.0, 6.0, 0.0], [-0.779, 5.851, 1.072], [0.779, 5.851, 1.072]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 448, "last_led": 482}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 483, "last_led": 524}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 525, "last_led": 559}], "strip": 30},
+{"id": 156, "vertices": [[-0.0, 6.0, 0.0], [-1.26, 5.851, -0.409], [-0.779, 5.851, 1.072]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 336, "last_led": 370}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 371, "last_led": 412}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 413, "last_led": 447}], "strip": 30},
+{"id": 157, "vertices": [[-0.0, 6.0, 0.0], [-0.0, 5.851, -1.325], [-1.26, 5.851, -0.409]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 224, "last_led": 258}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 259, "last_led": 300}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 301, "last_led": 335}], "strip": 30},
+{"id": 158, "vertices": [[-0.0, 6.0, 0.0], [1.26, 5.851, -0.409], [-0.0, 5.851, -1.325]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 112, "last_led": 146}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 147, "last_led": 188}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 189, "last_led": 223}], "strip": 30},
+{"id": 159, "vertices": [[-0.0, 6.0, 0.0], [0.779, 5.851, 1.072], [1.26, 5.851, -0.409]], "edges": [{"length": 1.155, "type": "A", "leds": 35, "first_led": 0, "last_led": 34}, {"length": 1.38, "type": "B", "leds": 42, "first_led": 35, "last_led": 76}, {"length": 1.155, "type": "A", "leds": 35, "first_led": 77, "last_led": 111}], "strip": 30}];
+struts = [{"start": [-1.854, 5.706, 0.0], "end": [-0.0, 6.0, 0.0], "center": [-0.927, 5.853, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": {"end": [-0.927, 0.0, 5.853]}, "original_length": 1.877165948977341, "length": 1.7, "edges": [{"triangle": 1, "edge": 2, "strip": 0, "alt_end": [-0.927, 5.853, 0.0]}], "ix": 0},
+{"start": [-3.527, 4.854, 0.0], "end": [-1.854, 5.706, 0.0], "center": [-2.6905, 5.28, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.877453860951049, "length": 1.7, "edges": [{"triangle": 3, "edge": 1, "strip": 1}], "ix": 1},
+{"start": [-4.854, 3.526, 0.0], "end": [-3.527, 4.854, 0.0], "center": [-4.1905, 4.1899999999999995, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.877368637215398, "length": 1.7, "edges": [{"triangle": 5, "edge": 0, "strip": 2}], "ix": 2},
+{"start": [-5.706, 1.854, 0.0], "end": [-4.854, 3.526, 0.0], "center": [-5.28, 2.69, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765628153621716, "length": 1.7, "edges": [{"triangle": 7, "edge": 2, "strip": 2}], "ix": 3},
+{"start": [-6.0, 0.0, 0.0], "end": [-5.706, 1.854, 0.0], "center": [-5.853, 0.927, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.877165948977341, "length": 1.7, "edges": [{"triangle": 9, "edge": 2, "strip": 2}], "ix": 4},
+{"start": [-5.706, -1.854, 0.0], "end": [-6.0, 0.0, 0.0], "center": [-5.853, -0.927, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.877165948977341, "length": 1.7, "edges": [{"triangle": 11, "edge": 1, "strip": 3}], "ix": 5},
+{"start": [-4.854, -3.526, 0.0], "end": [-5.706, -1.854, 0.0], "center": [-5.28, -2.69, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765628153621716, "length": 1.7, "edges": [{"triangle": 13, "edge": 0, "strip": 4}], "ix": 6},
+{"start": [-3.526, -4.854, 0.0], "end": [-4.854, -3.526, 0.0], "center": [-4.1899999999999995, -4.1899999999999995, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.8780756108314707, "length": 1.7, "edges": [{"triangle": 15, "edge": 2, "strip": 4}], "ix": 7},
+{"start": [-1.854, -5.706, 0.0], "end": [-3.526, -4.854, 0.0], "center": [-2.69, -5.28, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765628153621716, "length": 1.7, "edges": [{"triangle": 17, "edge": 2, "strip": 4}], "ix": 8},
+{"start": [-0.0, -6.0, 0.0], "end": [-1.854, -5.706, 0.0], "center": [-0.927, -5.853, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": {"start": [-0.8, 0.0, -5.873]}, "original_length": 1.877165948977341, "length": 1.7, "edges": [{"triangle": 19, "edge": 1, "strip": 5, "alt_start": [-0.8, -5.873, 0.0]}], "ix": 9},
+{"start": [1.854, -5.706, 0.0], "end": [-0.0, -6.0, 0.0], "center": [0.927, -5.853, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": {"end": [0.8, 0.0, -5.873]}, "original_length": 1.877165948977341, "length": 1.7, "edges": [{"triangle": 21, "edge": 0, "strip": 6, "alt_end": [0.8, -5.873, 0.0]}], "ix": 10},
+{"start": [3.526, -4.854, 0.0], "end": [1.854, -5.706, 0.0], "center": [2.69, -5.28, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765628153621716, "length": 1.7, "edges": [{"triangle": 23, "edge": 2, "strip": 6}], "ix": 11},
+{"start": [4.854, -3.526, 0.0], "end": [3.526, -4.854, 0.0], "center": [4.1899999999999995, -4.1899999999999995, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.8780756108314707, "length": 1.7, "edges": [{"triangle": 25, "edge": 2, "strip": 6}], "ix": 12},
+{"start": [5.706, -1.854, 0.0], "end": [4.854, -3.526, 0.0], "center": [5.28, -2.69, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765628153621716, "length": 1.7, "edges": [{"triangle": 27, "edge": 1, "strip": 7}], "ix": 13},
+{"start": [6.0, 0.0, 0.0], "end": [5.706, -1.854, 0.0], "center": [5.853, -0.927, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.877165948977341, "length": 1.7, "edges": [{"triangle": 29, "edge": 0, "strip": 8}], "ix": 14},
+{"start": [5.706, 1.854, 0.0], "end": [6.0, 0.0, 0.0], "center": [5.853, 0.927, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.877165948977341, "length": 1.7, "edges": [{"triangle": 31, "edge": 2, "strip": 8}], "ix": 15},
+{"start": [4.854, 3.527, 0.0], "end": [5.706, 1.854, 0.0], "center": [5.28, 2.6905, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.877453860951049, "length": 1.7, "edges": [{"triangle": 33, "edge": 2, "strip": 8}], "ix": 16},
+{"start": [3.526, 4.854, 0.0], "end": [4.854, 3.527, 0.0], "center": [4.1899999999999995, 4.1905, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.877368637215398, "length": 1.7, "edges": [{"triangle": 35, "edge": 1, "strip": 9}], "ix": 17},
+{"start": [1.854, 5.706, 0.0], "end": [3.526, 4.854, 0.0], "center": [2.69, 5.28, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765628153621716, "length": 1.7, "edges": [{"triangle": 37, "edge": 0, "strip": 0}], "ix": 18},
+{"start": [-0.0, 6.0, 0.0], "end": [1.854, 5.706, 0.0], "center": [0.927, 5.853, 0.0], "tier": 0, "type": "D", "extends_beyond_corner": {"start": [0.927, 0.0, 5.853]}, "original_length": 1.877165948977341, "length": 1.7, "edges": [{"triangle": 39, "edge": 2, "strip": 0, "alt_start": [0.927, 5.853, 0.0]}], "ix": 19},
+{"start": [-0.927, 5.853, 0.0], "end": [-0.974, 5.683, 1.658], "center": [-0.9505, 5.768, 0.829], "tier": 1, "type": "other", "extends_beyond_corner": null, "original_length": 1.6673550911548503, "length": 1.4903550911548502, "edges": [{"triangle": 1, "edge": 0, "strip": 0}], "ix": 20},
+{"start": [-0.974, 5.683, 1.658], "end": [-1.854, 5.706, 0.0], "center": [-1.4140000000000001, 5.6945, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8772035052172686, "length": 1.7, "edges": [{"triangle": 1, "edge": 1, "strip": 0}, {"triangle": 2, "edge": 1, "strip": 1}], "ix": 21},
+{"start": [-2.728, 5.08, 1.658], "end": [-1.854, 5.706, 0.0], "center": [-2.2910000000000004, 5.393000000000001, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.9760354247836753, "length": 1.799, "edges": [{"triangle": 2, "edge": 0, "strip": 1}, {"triangle": 3, "edge": 2, "strip": 1}], "ix": 22},
+{"start": [-2.728, 5.08, 1.658], "end": [-3.527, 4.854, 0.0], "center": [-3.1275000000000004, 4.9670000000000005, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8543033732375076, "length": 1.7, "edges": [{"triangle": 3, "edge": 0, "strip": 1}, {"triangle": 4, "edge": 2, "strip": 1}], "ix": 23},
+{"start": [-3.988, 4.164, 1.658], "end": [-3.527, 4.854, 0.0], "center": [-3.7575000000000003, 4.509, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8540725444275366, "length": 1.7, "edges": [{"triangle": 4, "edge": 1, "strip": 1}, {"triangle": 5, "edge": 1, "strip": 2}], "ix": 24},
+{"start": [-3.988, 4.164, 1.658], "end": [-4.854, 3.526, 0.0], "center": [-4.421, 3.8449999999999998, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.976351183367976, "length": 1.799, "edges": [{"triangle": 5, "edge": 2, "strip": 2}, {"triangle": 6, "edge": 0, "strip": 2}], "ix": 25},
+{"start": [-5.103, 2.683, 1.658], "end": [-4.854, 3.526, 0.0], "center": [-4.9785, 3.1045, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765963870795446, "length": 1.7, "edges": [{"triangle": 6, "edge": 2, "strip": 2}, {"triangle": 7, "edge": 0, "strip": 2}], "ix": 26},
+{"start": [-5.103, 2.683, 1.658], "end": [-5.706, 1.854, 0.0], "center": [-5.4045000000000005, 2.2685, 0.829], "tier": 1, "type": "E", "extends_beyond_corner": null, "original_length": 1.9493111603846112, "length": 1.772, "edges": [{"triangle": 7, "edge": 1, "strip": 2}, {"triangle": 8, "edge": 0, "strip": 2}], "ix": 27},
+{"start": [-5.706, 0.829, 1.658], "end": [-5.706, 1.854, 0.0], "center": [-5.706, 1.3415, 0.829], "tier": 1, "type": "E", "extends_beyond_corner": null, "original_length": 1.94925344683548, "length": 1.772, "edges": [{"triangle": 8, "edge": 2, "strip": 2}, {"triangle": 9, "edge": 0, "strip": 2}], "ix": 28},
+{"start": [-5.706, 0.829, 1.658], "end": [-6.0, 0.0, 0.0], "center": [-5.853, 0.4145, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8768700008258428, "length": 1.7, "edges": [{"triangle": 9, "edge": 1, "strip": 2}, {"triangle": 10, "edge": 1, "strip": 3}], "ix": 29},
+{"start": [-5.674, -1.025, 1.658], "end": [-6.0, 0.0, 0.0], "center": [-5.837, -0.5125, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.976326137053295, "length": 1.799, "edges": [{"triangle": 10, "edge": 0, "strip": 3}, {"triangle": 11, "edge": 2, "strip": 3}], "ix": 30},
+{"start": [-5.674, -1.025, 1.658], "end": [-5.706, -1.854, 0.0], "center": [-5.69, -1.4395, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539765370683632, "length": 1.7, "edges": [{"triangle": 11, "edge": 0, "strip": 3}, {"triangle": 12, "edge": 2, "strip": 3}], "ix": 31},
+{"start": [-5.193, -2.506, 1.658], "end": [-5.706, -1.854, 0.0], "center": [-5.4495000000000005, -2.1799999999999997, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.853978694591715, "length": 1.7, "edges": [{"triangle": 12, "edge": 1, "strip": 3}, {"triangle": 13, "edge": 1, "strip": 4}], "ix": 32},
+{"start": [-5.193, -2.506, 1.658], "end": [-4.854, -3.526, 0.0], "center": [-5.0235, -3.016, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.9759263650247696, "length": 1.799, "edges": [{"triangle": 13, "edge": 2, "strip": 4}, {"triangle": 14, "edge": 0, "strip": 4}], "ix": 33},
+{"start": [-4.129, -4.025, 1.658], "end": [-4.854, -3.526, 0.0], "center": [-4.4915, -3.7755, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.87712279832727, "length": 1.7, "edges": [{"triangle": 14, "edge": 2, "strip": 4}, {"triangle": 15, "edge": 0, "strip": 4}], "ix": 34},
+{"start": [-4.129, -4.025, 1.658], "end": [-3.526, -4.854, 0.0], "center": [-3.8274999999999997, -4.439500000000001, 0.829], "tier": 1, "type": "E", "extends_beyond_corner": null, "original_length": 1.949311160384611, "length": 1.772, "edges": [{"triangle": 15, "edge": 1, "strip": 4}, {"triangle": 16, "edge": 0, "strip": 4}], "ix": 35},
+{"start": [-2.552, -5.17, 1.658], "end": [-3.526, -4.854, 0.0], "center": [-3.0389999999999997, -5.0120000000000005, 0.829], "tier": 1, "type": "E", "extends_beyond_corner": null, "original_length": 1.9487165006742255, "length": 1.772, "edges": [{"triangle": 16, "edge": 2, "strip": 4}, {"triangle": 17, "edge": 0, "strip": 4}], "ix": 36},
+{"start": [-2.552, -5.17, 1.658], "end": [-1.854, -5.706, 0.0], "center": [-2.2030000000000003, -5.438000000000001, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770892360247553, "length": 1.7, "edges": [{"triangle": 17, "edge": 1, "strip": 4}, {"triangle": 18, "edge": 1, "strip": 5}], "ix": 37},
+{"start": [-0.779, -5.713, 1.658], "end": [-1.854, -5.706, 0.0], "center": [-1.3165, -5.7095, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.976015688196832, "length": 1.799, "edges": [{"triangle": 18, "edge": 0, "strip": 5}, {"triangle": 19, "edge": 2, "strip": 5}], "ix": 38},
+{"start": [-0.779, -5.713, 1.658], "end": [-0.8, -5.873, 0.0], "center": [-0.7895000000000001, -5.793, 0.829], "tier": 1, "type": "other", "extends_beyond_corner": null, "original_length": 1.665834625645655, "length": 1.488834625645655, "edges": [{"triangle": 19, "edge": 0, "strip": 5}], "ix": 39},
+{"start": [0.8, -5.873, 0.0], "end": [0.779, -5.713, 1.658], "center": [0.7895000000000001, -5.793, 0.829], "tier": 1, "type": "other", "extends_beyond_corner": null, "original_length": 1.665834625645655, "length": 1.488834625645655, "edges": [{"triangle": 21, "edge": 1, "strip": 6}], "ix": 40},
+{"start": [0.779, -5.713, 1.658], "end": [1.854, -5.706, 0.0], "center": [1.3165, -5.7095, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.976015688196832, "length": 1.799, "edges": [{"triangle": 21, "edge": 2, "strip": 6}, {"triangle": 22, "edge": 0, "strip": 6}], "ix": 41},
+{"start": [2.552, -5.17, 1.658], "end": [1.854, -5.706, 0.0], "center": [2.2030000000000003, -5.438000000000001, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770892360247553, "length": 1.7, "edges": [{"triangle": 22, "edge": 2, "strip": 6}, {"triangle": 23, "edge": 0, "strip": 6}], "ix": 42},
+{"start": [2.552, -5.17, 1.658], "end": [3.526, -4.854, 0.0], "center": [3.0389999999999997, -5.0120000000000005, 0.829], "tier": 1, "type": "E", "extends_beyond_corner": null, "original_length": 1.9487165006742255, "length": 1.772, "edges": [{"triangle": 23, "edge": 1, "strip": 6}, {"triangle": 24, "edge": 0, "strip": 6}], "ix": 43},
+{"start": [4.129, -4.025, 1.658], "end": [3.526, -4.854, 0.0], "center": [3.8274999999999997, -4.439500000000001, 0.829], "tier": 1, "type": "E", "extends_beyond_corner": null, "original_length": 1.949311160384611, "length": 1.772, "edges": [{"triangle": 24, "edge": 2, "strip": 6}, {"triangle": 25, "edge": 0, "strip": 6}], "ix": 44},
+{"start": [4.129, -4.025, 1.658], "end": [4.854, -3.526, 0.0], "center": [4.4915, -3.7755, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.87712279832727, "length": 1.7, "edges": [{"triangle": 25, "edge": 1, "strip": 6}, {"triangle": 26, "edge": 1, "strip": 7}], "ix": 45},
+{"start": [5.193, -2.506, 1.658], "end": [4.854, -3.526, 0.0], "center": [5.0235, -3.016, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.9759263650247696, "length": 1.799, "edges": [{"triangle": 26, "edge": 0, "strip": 7}, {"triangle": 27, "edge": 2, "strip": 7}], "ix": 46},
+{"start": [5.193, -2.506, 1.658], "end": [5.706, -1.854, 0.0], "center": [5.4495000000000005, -2.1799999999999997, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.853978694591715, "length": 1.7, "edges": [{"triangle": 27, "edge": 0, "strip": 7}, {"triangle": 28, "edge": 2, "strip": 7}], "ix": 47},
+{"start": [5.674, -1.025, 1.658], "end": [5.706, -1.854, 0.0], "center": [5.69, -1.4395, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539765370683632, "length": 1.7, "edges": [{"triangle": 28, "edge": 1, "strip": 7}, {"triangle": 29, "edge": 1, "strip": 8}], "ix": 48},
+{"start": [5.674, -1.025, 1.658], "end": [6.0, 0.0, 0.0], "center": [5.837, -0.5125, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.976326137053295, "length": 1.799, "edges": [{"triangle": 29, "edge": 2, "strip": 8}, {"triangle": 30, "edge": 0, "strip": 8}], "ix": 49},
+{"start": [5.706, 0.829, 1.658], "end": [6.0, 0.0, 0.0], "center": [5.853, 0.4145, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8768700008258428, "length": 1.7, "edges": [{"triangle": 30, "edge": 2, "strip": 8}, {"triangle": 31, "edge": 0, "strip": 8}], "ix": 50},
+{"start": [5.706, 0.829, 1.658], "end": [5.706, 1.854, 0.0], "center": [5.706, 1.3415, 0.829], "tier": 1, "type": "E", "extends_beyond_corner": null, "original_length": 1.94925344683548, "length": 1.772, "edges": [{"triangle": 31, "edge": 1, "strip": 8}, {"triangle": 32, "edge": 0, "strip": 8}], "ix": 51},
+{"start": [5.103, 2.683, 1.658], "end": [5.706, 1.854, 0.0], "center": [5.4045000000000005, 2.2685, 0.829], "tier": 1, "type": "E", "extends_beyond_corner": null, "original_length": 1.9493111603846112, "length": 1.772, "edges": [{"triangle": 32, "edge": 2, "strip": 8}, {"triangle": 33, "edge": 0, "strip": 8}], "ix": 52},
+{"start": [5.103, 2.683, 1.658], "end": [4.854, 3.527, 0.0], "center": [4.9785, 3.105, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770458172351574, "length": 1.7, "edges": [{"triangle": 33, "edge": 1, "strip": 8}, {"triangle": 34, "edge": 1, "strip": 9}], "ix": 53},
+{"start": [3.988, 4.164, 1.658], "end": [4.854, 3.527, 0.0], "center": [4.421, 3.8455, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.9760285929105377, "length": 1.799, "edges": [{"triangle": 34, "edge": 0, "strip": 9}, {"triangle": 35, "edge": 2, "strip": 9}], "ix": 54},
+{"start": [3.988, 4.164, 1.658], "end": [3.526, 4.854, 0.0], "center": [3.7569999999999997, 4.509, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8543214392332308, "length": 1.7, "edges": [{"triangle": 35, "edge": 0, "strip": 9}, {"triangle": 36, "edge": 2, "strip": 9}], "ix": 55},
+{"start": [2.728, 5.08, 1.658], "end": [3.526, 4.854, 0.0], "center": [3.127, 4.9670000000000005, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8538727032889823, "length": 1.7, "edges": [{"triangle": 36, "edge": 1, "strip": 9}, {"triangle": 37, "edge": 1, "strip": 0}], "ix": 56},
+{"start": [2.728, 5.08, 1.658], "end": [1.854, 5.706, 0.0], "center": [2.2910000000000004, 5.393000000000001, 0.829], "tier": 1, "type": "F", "extends_beyond_corner": null, "original_length": 1.9760354247836753, "length": 1.799, "edges": [{"triangle": 37, "edge": 2, "strip": 0}, {"triangle": 38, "edge": 0, "strip": 0}], "ix": 57},
+{"start": [0.975, 5.683, 1.658], "end": [1.854, 5.706, 0.0], "center": [1.4145, 5.6945, 0.829], "tier": 1, "type": "D", "extends_beyond_corner": null, "original_length": 1.8767349306708179, "length": 1.7, "edges": [{"triangle": 38, "edge": 2, "strip": 0}, {"triangle": 39, "edge": 0, "strip": 0}], "ix": 58},
+{"start": [0.975, 5.683, 1.658], "end": [0.927, 5.853, 0.0], "center": [0.9510000000000001, 5.768, 0.829], "tier": 1, "type": "other", "extends_beyond_corner": null, "original_length": 1.667383579144283, "length": 1.490383579144283, "edges": [{"triangle": 39, "edge": 1, "strip": 0}], "ix": 59},
+{"start": [-0.974, 5.683, 1.658], "end": [-2.728, 5.08, 1.658], "center": [-1.851, 5.3815, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.854757396534652, "length": 1.7, "edges": [{"triangle": 2, "edge": 2, "strip": 1}, {"triangle": 42, "edge": 0, "strip": 1}], "ix": 60},
+{"start": [-2.728, 5.08, 1.658], "end": [-3.988, 4.164, 1.658], "center": [-3.358, 4.622, 1.658], "tier": 2, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577727690520207, "length": 1.38, "edges": [{"triangle": 4, "edge": 0, "strip": 1}, {"triangle": 44, "edge": 2, "strip": 1}], "ix": 61},
+{"start": [-3.988, 4.164, 1.658], "end": [-5.103, 2.683, 1.658], "center": [-4.5455, 3.4234999999999998, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.853803117917326, "length": 1.7, "edges": [{"triangle": 6, "edge": 1, "strip": 2}, {"triangle": 46, "edge": 1, "strip": 12}], "ix": 62},
+{"start": [-5.103, 2.683, 1.658], "end": [-5.706, 0.829, 1.658], "center": [-5.4045000000000005, 1.7559999999999998, 1.658], "tier": 2, "type": "E", "extends_beyond_corner": null, "original_length": 1.9495961120191023, "length": 1.772, "edges": [{"triangle": 8, "edge": 1, "strip": 2}, {"triangle": 48, "edge": 1, "strip": 13}], "ix": 63},
+{"start": [-5.706, 0.829, 1.658], "end": [-5.674, -1.025, 1.658], "center": [-5.69, -0.09799999999999998, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.8542761390904, "length": 1.7, "edges": [{"triangle": 10, "edge": 2, "strip": 3}, {"triangle": 50, "edge": 0, "strip": 3}], "ix": 64},
+{"start": [-5.674, -1.025, 1.658], "end": [-5.193, -2.506, 1.658], "center": [-5.4335, -1.7654999999999998, 1.658], "tier": 2, "type": "B", "extends_beyond_corner": null, "original_length": 1.5571518872608414, "length": 1.38, "edges": [{"triangle": 12, "edge": 0, "strip": 3}, {"triangle": 52, "edge": 2, "strip": 3}], "ix": 65},
+{"start": [-5.193, -2.506, 1.658], "end": [-4.129, -4.025, 1.658], "center": [-4.661, -3.2655000000000003, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.8545773103324654, "length": 1.7, "edges": [{"triangle": 14, "edge": 1, "strip": 4}, {"triangle": 54, "edge": 1, "strip": 15}], "ix": 66},
+{"start": [-4.129, -4.025, 1.658], "end": [-2.552, -5.17, 1.658], "center": [-3.3404999999999996, -4.5975, 1.658], "tier": 2, "type": "E", "extends_beyond_corner": null, "original_length": 1.9488340103764603, "length": 1.772, "edges": [{"triangle": 16, "edge": 1, "strip": 4}, {"triangle": 56, "edge": 1, "strip": 16}], "ix": 67},
+{"start": [-2.552, -5.17, 1.658], "end": [-0.779, -5.713, 1.658], "center": [-1.6655, -5.4415, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.8542863856481286, "length": 1.7, "edges": [{"triangle": 18, "edge": 2, "strip": 5}, {"triangle": 58, "edge": 0, "strip": 5}], "ix": 68},
+{"start": [0.779, -5.713, 1.658], "end": [2.552, -5.17, 1.658], "center": [1.6655, -5.4415, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.8542863856481286, "length": 1.7, "edges": [{"triangle": 22, "edge": 1, "strip": 6}, {"triangle": 62, "edge": 1, "strip": 18}], "ix": 69},
+{"start": [2.552, -5.17, 1.658], "end": [4.129, -4.025, 1.658], "center": [3.3404999999999996, -4.5975, 1.658], "tier": 2, "type": "E", "extends_beyond_corner": null, "original_length": 1.9488340103764603, "length": 1.772, "edges": [{"triangle": 24, "edge": 1, "strip": 6}, {"triangle": 64, "edge": 1, "strip": 19}], "ix": 70},
+{"start": [4.129, -4.025, 1.658], "end": [5.193, -2.506, 1.658], "center": [4.661, -3.2655000000000003, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.8545773103324654, "length": 1.7, "edges": [{"triangle": 26, "edge": 2, "strip": 7}, {"triangle": 66, "edge": 0, "strip": 7}], "ix": 71},
+{"start": [5.193, -2.506, 1.658], "end": [5.674, -1.025, 1.658], "center": [5.4335, -1.7654999999999998, 1.658], "tier": 2, "type": "B", "extends_beyond_corner": null, "original_length": 1.5571518872608414, "length": 1.38, "edges": [{"triangle": 28, "edge": 0, "strip": 7}, {"triangle": 68, "edge": 2, "strip": 7}], "ix": 72},
+{"start": [5.674, -1.025, 1.658], "end": [5.706, 0.829, 1.658], "center": [5.69, -0.09799999999999998, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.8542761390904, "length": 1.7, "edges": [{"triangle": 30, "edge": 1, "strip": 8}, {"triangle": 70, "edge": 1, "strip": 21}], "ix": 73},
+{"start": [5.706, 0.829, 1.658], "end": [5.103, 2.683, 1.658], "center": [5.4045000000000005, 1.7559999999999998, 1.658], "tier": 2, "type": "E", "extends_beyond_corner": null, "original_length": 1.9495961120191023, "length": 1.772, "edges": [{"triangle": 32, "edge": 1, "strip": 8}, {"triangle": 72, "edge": 1, "strip": 22}], "ix": 74},
+{"start": [5.103, 2.683, 1.658], "end": [3.988, 4.164, 1.658], "center": [4.5455, 3.4234999999999998, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.853803117917326, "length": 1.7, "edges": [{"triangle": 34, "edge": 2, "strip": 9}, {"triangle": 74, "edge": 0, "strip": 9}], "ix": 75},
+{"start": [3.988, 4.164, 1.658], "end": [2.728, 5.08, 1.658], "center": [3.358, 4.622, 1.658], "tier": 2, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577727690520207, "length": 1.38, "edges": [{"triangle": 36, "edge": 0, "strip": 9}, {"triangle": 76, "edge": 2, "strip": 9}], "ix": 76},
+{"start": [2.728, 5.08, 1.658], "end": [0.975, 5.683, 1.658], "center": [1.8515000000000001, 5.3815, 1.658], "tier": 2, "type": "D", "extends_beyond_corner": null, "original_length": 1.85381174880299, "length": 1.7, "edges": [{"triangle": 38, "edge": 1, "strip": 0}, {"triangle": 78, "edge": 1, "strip": 24}], "ix": 77},
+{"start": [-0.974, 5.683, 1.658], "end": [0.0, 5.104, 3.154], "center": [-0.487, 5.3934999999999995, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8766813794568324, "length": 1.7, "edges": [{"triangle": 41, "edge": 2, "strip": 10}, {"alt_start": null, "alt_end": [-0.687, 5.512, 2.1], "triangle": 40, "edge": 0, "strip": 10}], "ix": 78},
+{"start": [-1.95, 4.827, 2.983], "end": [-0.974, 5.683, 1.658], "center": [-1.462, 5.255, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8549762801717977, "length": 1.7, "edges": [{"triangle": 41, "edge": 1, "strip": 10}, {"triangle": 42, "edge": 1, "strip": 1}], "ix": 79},
+{"start": [-1.95, 4.827, 2.983], "end": [-2.728, 5.08, 1.658], "center": [-2.339, 4.9535, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.5572148214039065, "length": 1.38, "edges": [{"triangle": 42, "edge": 2, "strip": 1}, {"triangle": 43, "edge": 0, "strip": 1}], "ix": 80},
+{"start": [-3.154, 4.341, 2.683], "end": [-2.728, 5.08, 1.658], "center": [-2.941, 4.7105, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3334999062617139, "length": 1.155, "edges": [{"triangle": 43, "edge": 2, "strip": 1}, {"triangle": 44, "edge": 0, "strip": 1}], "ix": 81},
+{"start": [-3.154, 4.341, 2.683], "end": [-3.988, 4.164, 1.658], "center": [-3.5709999999999997, 4.2524999999999995, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3332329128850668, "length": 1.155, "edges": [{"triangle": 44, "edge": 1, "strip": 1}, {"triangle": 45, "edge": 1, "strip": 12}], "ix": 82},
+{"start": [-3.988, 3.345, 2.983], "end": [-3.988, 4.164, 1.658], "center": [-3.988, 3.7545, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.557686104451086, "length": 1.38, "edges": [{"triangle": 45, "edge": 0, "strip": 12}, {"triangle": 46, "edge": 2, "strip": 12}], "ix": 83},
+{"start": [-3.988, 3.345, 2.983], "end": [-5.103, 2.683, 1.658], "center": [-4.5455, 3.0140000000000002, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.853940128483118, "length": 1.7, "edges": [{"triangle": 46, "edge": 0, "strip": 12}, {"triangle": 47, "edge": 1, "strip": 13}], "ix": 84},
+{"start": [-4.854, 1.577, 3.154], "end": [-5.103, 2.683, 1.658], "center": [-4.9785, 2.13, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770330311424994, "length": 1.7, "edges": [{"triangle": 47, "edge": 0, "strip": 13}, {"triangle": 48, "edge": 2, "strip": 13}], "ix": 85},
+{"start": [-4.854, 1.577, 3.154], "end": [-5.706, 0.829, 1.658], "center": [-5.28, 1.2029999999999998, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.877078581200052, "length": 1.7, "edges": [{"triangle": 48, "edge": 0, "strip": 13}, {"triangle": 49, "edge": 2, "strip": 13}], "ix": 86},
+{"start": [-5.193, -0.362, 2.983], "end": [-5.706, 0.829, 1.658], "center": [-5.4495000000000005, 0.23349999999999999, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539889427933494, "length": 1.7, "edges": [{"triangle": 49, "edge": 1, "strip": 13}, {"triangle": 50, "edge": 1, "strip": 3}], "ix": 87},
+{"start": [-5.193, -0.362, 2.983], "end": [-5.674, -1.025, 1.658], "center": [-5.4335, -0.6935, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.557740350636139, "length": 1.38, "edges": [{"triangle": 50, "edge": 2, "strip": 3}, {"triangle": 51, "edge": 0, "strip": 3}], "ix": 88},
+{"start": [-5.103, -1.658, 2.683], "end": [-5.674, -1.025, 1.658], "center": [-5.3885000000000005, -1.3415, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3331747822397484, "length": 1.155, "edges": [{"triangle": 51, "edge": 2, "strip": 3}, {"triangle": 52, "edge": 0, "strip": 3}], "ix": 89},
+{"start": [-5.103, -1.658, 2.683], "end": [-5.193, -2.506, 1.658], "center": [-5.148, -2.082, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3333525415283085, "length": 1.155, "edges": [{"triangle": 52, "edge": 1, "strip": 3}, {"triangle": 53, "edge": 1, "strip": 15}], "ix": 90},
+{"start": [-4.414, -2.759, 2.983], "end": [-5.193, -2.506, 1.658], "center": [-4.8035, -2.6325, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577146722041237, "length": 1.38, "edges": [{"triangle": 53, "edge": 0, "strip": 15}, {"triangle": 54, "edge": 2, "strip": 15}], "ix": 91},
+{"start": [-4.414, -2.759, 2.983], "end": [-4.129, -4.025, 1.658], "center": [-4.2715, -3.3920000000000003, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.854617480776023, "length": 1.7, "edges": [{"triangle": 54, "edge": 0, "strip": 15}, {"triangle": 55, "edge": 1, "strip": 16}], "ix": 92},
+{"start": [-3.0, -4.129, 3.154], "end": [-4.129, -4.025, 1.658], "center": [-3.5645, -4.077, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770916333519787, "length": 1.7, "edges": [{"triangle": 55, "edge": 0, "strip": 16}, {"triangle": 56, "edge": 2, "strip": 16}], "ix": 93},
+{"start": [-3.0, -4.129, 3.154], "end": [-2.552, -5.17, 1.658], "center": [-2.776, -4.6495, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8768060635025667, "length": 1.7, "edges": [{"triangle": 56, "edge": 0, "strip": 16}, {"triangle": 57, "edge": 2, "strip": 16}], "ix": 94},
+{"start": [-1.26, -5.051, 2.983], "end": [-2.552, -5.17, 1.658], "center": [-1.9060000000000001, -5.1105, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8544675785788223, "length": 1.7, "edges": [{"triangle": 57, "edge": 1, "strip": 16}, {"triangle": 58, "edge": 1, "strip": 5}], "ix": 95},
+{"start": [-1.26, -5.051, 2.983], "end": [-0.779, -5.713, 1.658], "center": [-1.0195, -5.382, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.5573149970381717, "length": 1.38, "edges": [{"triangle": 58, "edge": 2, "strip": 5}, {"triangle": 59, "edge": 0, "strip": 5}], "ix": 96},
+{"start": [-0.0, -5.366, 2.683], "end": [-0.779, -5.713, 1.658], "center": [-0.3895, -5.5395, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3333697911682267, "length": 1.155, "edges": [{"triangle": 59, "edge": 2, "strip": 5}, {"alt_start": [-0.438, -5.558, 2.1], "alt_end": null, "triangle": 60, "edge": 0, "strip": 5}], "ix": 97},
+{"start": [0.438, -5.558, 2.1], "end": [-0.438, -5.558, 2.1], "center": [0.0, -5.558, 2.1], "tier": 3, "type": "other", "extends_beyond_corner": null, "original_length": 0.876, "length": 0.6990000000000001, "edges": [{"triangle": 60, "edge": 2, "strip": 5}], "ix": 98},
+{"start": [0.779, -5.713, 1.658], "end": [-0.0, -5.366, 2.683], "center": [0.3895, -5.5395, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3333697911682267, "length": 1.155, "edges": [{"triangle": 61, "edge": 1, "strip": 18}, {"alt_start": null, "alt_end": [0.438, -5.558, 2.1], "triangle": 60, "edge": 1, "strip": 5}], "ix": 99},
+{"start": [1.26, -5.051, 2.983], "end": [0.779, -5.713, 1.658], "center": [1.0195, -5.382, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.5573149970381717, "length": 1.38, "edges": [{"triangle": 61, "edge": 0, "strip": 18}, {"triangle": 62, "edge": 2, "strip": 18}], "ix": 100},
+{"start": [1.26, -5.051, 2.983], "end": [2.552, -5.17, 1.658], "center": [1.9060000000000001, -5.1105, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8544675785788223, "length": 1.7, "edges": [{"triangle": 62, "edge": 0, "strip": 18}, {"triangle": 63, "edge": 1, "strip": 19}], "ix": 101},
+{"start": [3.0, -4.129, 3.154], "end": [2.552, -5.17, 1.658], "center": [2.776, -4.6495, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8768060635025667, "length": 1.7, "edges": [{"triangle": 63, "edge": 0, "strip": 19}, {"triangle": 64, "edge": 2, "strip": 19}], "ix": 102},
+{"start": [3.0, -4.129, 3.154], "end": [4.129, -4.025, 1.658], "center": [3.5645, -4.077, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770916333519787, "length": 1.7, "edges": [{"triangle": 64, "edge": 0, "strip": 19}, {"triangle": 65, "edge": 2, "strip": 19}], "ix": 103},
+{"start": [4.414, -2.759, 2.983], "end": [4.129, -4.025, 1.658], "center": [4.2715, -3.3920000000000003, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.854617480776023, "length": 1.7, "edges": [{"triangle": 65, "edge": 1, "strip": 19}, {"triangle": 66, "edge": 1, "strip": 7}], "ix": 104},
+{"start": [4.414, -2.759, 2.983], "end": [5.193, -2.506, 1.658], "center": [4.8035, -2.6325, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577146722041237, "length": 1.38, "edges": [{"triangle": 66, "edge": 2, "strip": 7}, {"triangle": 67, "edge": 0, "strip": 7}], "ix": 105},
+{"start": [5.103, -1.658, 2.683], "end": [5.193, -2.506, 1.658], "center": [5.148, -2.082, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3333525415283085, "length": 1.155, "edges": [{"triangle": 67, "edge": 2, "strip": 7}, {"triangle": 68, "edge": 0, "strip": 7}], "ix": 106},
+{"start": [5.103, -1.658, 2.683], "end": [5.674, -1.025, 1.658], "center": [5.3885000000000005, -1.3415, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3331747822397484, "length": 1.155, "edges": [{"triangle": 68, "edge": 1, "strip": 7}, {"triangle": 69, "edge": 1, "strip": 21}], "ix": 107},
+{"start": [5.193, -0.362, 2.983], "end": [5.674, -1.025, 1.658], "center": [5.4335, -0.6935, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.557740350636139, "length": 1.38, "edges": [{"triangle": 69, "edge": 0, "strip": 21}, {"triangle": 70, "edge": 2, "strip": 21}], "ix": 108},
+{"start": [5.193, -0.362, 2.983], "end": [5.706, 0.829, 1.658], "center": [5.4495000000000005, 0.23349999999999999, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539889427933494, "length": 1.7, "edges": [{"triangle": 70, "edge": 0, "strip": 21}, {"triangle": 71, "edge": 1, "strip": 22}], "ix": 109},
+{"start": [4.854, 1.577, 3.154], "end": [5.706, 0.829, 1.658], "center": [5.28, 1.2029999999999998, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.877078581200052, "length": 1.7, "edges": [{"triangle": 71, "edge": 0, "strip": 22}, {"triangle": 72, "edge": 2, "strip": 22}], "ix": 110},
+{"start": [4.854, 1.577, 3.154], "end": [5.103, 2.683, 1.658], "center": [4.9785, 2.13, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770330311424994, "length": 1.7, "edges": [{"triangle": 72, "edge": 0, "strip": 22}, {"triangle": 73, "edge": 2, "strip": 22}], "ix": 111},
+{"start": [3.988, 3.345, 2.983], "end": [5.103, 2.683, 1.658], "center": [4.5455, 3.0140000000000002, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.853940128483118, "length": 1.7, "edges": [{"triangle": 73, "edge": 1, "strip": 22}, {"triangle": 74, "edge": 1, "strip": 9}], "ix": 112},
+{"start": [3.988, 3.345, 2.983], "end": [3.988, 4.164, 1.658], "center": [3.988, 3.7545, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.557686104451086, "length": 1.38, "edges": [{"triangle": 74, "edge": 2, "strip": 9}, {"triangle": 75, "edge": 0, "strip": 9}], "ix": 113},
+{"start": [3.154, 4.341, 2.683], "end": [3.988, 4.164, 1.658], "center": [3.5709999999999997, 4.2524999999999995, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3332329128850668, "length": 1.155, "edges": [{"triangle": 75, "edge": 2, "strip": 9}, {"triangle": 76, "edge": 0, "strip": 9}], "ix": 114},
+{"start": [3.154, 4.341, 2.683], "end": [2.728, 5.08, 1.658], "center": [2.941, 4.7105, 2.1704999999999997], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.3334999062617139, "length": 1.155, "edges": [{"triangle": 76, "edge": 1, "strip": 9}, {"triangle": 77, "edge": 1, "strip": 24}], "ix": 115},
+{"start": [1.949, 4.827, 2.983], "end": [2.728, 5.08, 1.658], "center": [2.3385000000000002, 4.9535, 2.3205], "tier": 3, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577146722041237, "length": 1.38, "edges": [{"triangle": 77, "edge": 0, "strip": 24}, {"triangle": 78, "edge": 2, "strip": 24}], "ix": 116},
+{"start": [1.949, 4.827, 2.983], "end": [0.975, 5.683, 1.658], "center": [1.462, 5.255, 2.3205], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539247557546665, "length": 1.7, "edges": [{"triangle": 78, "edge": 0, "strip": 24}, {"triangle": 79, "edge": 1, "strip": 10}], "ix": 117},
+{"start": [0.0, 5.104, 3.154], "end": [0.975, 5.683, 1.658], "center": [0.4875, 5.3934999999999995, 2.4059999999999997], "tier": 3, "type": "D", "extends_beyond_corner": null, "original_length": 1.8772005753248637, "length": 1.7, "edges": [{"triangle": 79, "edge": 0, "strip": 10}, {"alt_start": [0.687, 5.512, 2.1], "alt_end": null, "triangle": 40, "edge": 2, "strip": 10}], "ix": 118},
+{"start": [-0.687, 5.512, 2.1], "end": [0.687, 5.512, 2.1], "center": [0.0, 5.512, 2.1], "tier": 3, "type": "A", "extends_beyond_corner": null, "original_length": 1.374, "length": 1.155, "edges": [{"triangle": 40, "edge": 1, "strip": 10}], "ix": 119},
+{"start": [0.0, 5.104, 3.154], "end": [-1.95, 4.827, 2.983], "center": [-0.975, 4.9655000000000005, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.9769850783453071, "length": 1.799, "edges": [{"triangle": 41, "edge": 0, "strip": 10}, {"triangle": 81, "edge": 2, "strip": 10}], "ix": 120},
+{"start": [-1.95, 4.827, 2.983], "end": [-3.154, 4.341, 2.683], "center": [-2.552, 4.584, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.332595962773413, "length": 1.155, "edges": [{"triangle": 43, "edge": 1, "strip": 1}, {"triangle": 83, "edge": 1, "strip": 11}], "ix": 121},
+{"start": [-3.154, 4.341, 2.683], "end": [-3.988, 3.345, 2.983], "center": [-3.5709999999999997, 3.843, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3332561644335272, "length": 1.155, "edges": [{"triangle": 45, "edge": 2, "strip": 12}, {"triangle": 84, "edge": 0, "strip": 12}], "ix": 122},
+{"start": [-3.988, 3.345, 2.983], "end": [-4.854, 1.577, 3.154], "center": [-4.421, 2.4610000000000003, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.9761125980065004, "length": 1.799, "edges": [{"triangle": 47, "edge": 2, "strip": 13}, {"triangle": 86, "edge": 2, "strip": 12}], "ix": 123},
+{"start": [-4.854, 1.577, 3.154], "end": [-5.193, -0.362, 2.983], "center": [-5.0235, 0.6074999999999999, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.9758246379676512, "length": 1.799, "edges": [{"triangle": 49, "edge": 0, "strip": 13}, {"triangle": 88, "edge": 2, "strip": 13}], "ix": 124},
+{"start": [-5.193, -0.362, 2.983], "end": [-5.103, -1.658, 2.683], "center": [-5.148, -1.01, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3333101664654026, "length": 1.155, "edges": [{"triangle": 51, "edge": 1, "strip": 3}, {"triangle": 90, "edge": 1, "strip": 14}], "ix": 125},
+{"start": [-5.103, -1.658, 2.683], "end": [-4.414, -2.759, 2.983], "center": [-4.7585, -2.2085, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3330123780370533, "length": 1.155, "edges": [{"triangle": 53, "edge": 2, "strip": 15}, {"triangle": 91, "edge": 0, "strip": 15}], "ix": 126},
+{"start": [-4.414, -2.759, 2.983], "end": [-3.0, -4.129, 3.154], "center": [-3.707, -3.444, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.976243153055817, "length": 1.799, "edges": [{"triangle": 55, "edge": 2, "strip": 16}, {"triangle": 93, "edge": 2, "strip": 15}], "ix": 127},
+{"start": [-3.0, -4.129, 3.154], "end": [-1.26, -5.051, 2.983], "center": [-2.13, -4.59, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.9765942932225624, "length": 1.799, "edges": [{"triangle": 57, "edge": 0, "strip": 16}, {"triangle": 95, "edge": 2, "strip": 16}], "ix": 128},
+{"start": [-1.26, -5.051, 2.983], "end": [-0.0, -5.366, 2.683], "center": [-0.63, -5.2085, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3329759937823336, "length": 1.155, "edges": [{"triangle": 59, "edge": 1, "strip": 5}, {"triangle": 97, "edge": 1, "strip": 17}], "ix": 129},
+{"start": [-0.0, -5.366, 2.683], "end": [1.26, -5.051, 2.983], "center": [0.63, -5.2085, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3329759937823336, "length": 1.155, "edges": [{"triangle": 61, "edge": 2, "strip": 18}, {"triangle": 98, "edge": 0, "strip": 18}], "ix": 130},
+{"start": [1.26, -5.051, 2.983], "end": [3.0, -4.129, 3.154], "center": [2.13, -4.59, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.9765942932225624, "length": 1.799, "edges": [{"triangle": 63, "edge": 2, "strip": 19}, {"triangle": 100, "edge": 2, "strip": 18}], "ix": 131},
+{"start": [3.0, -4.129, 3.154], "end": [4.414, -2.759, 2.983], "center": [3.707, -3.444, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.976243153055817, "length": 1.799, "edges": [{"triangle": 65, "edge": 0, "strip": 19}, {"triangle": 102, "edge": 2, "strip": 19}], "ix": 132},
+{"start": [4.414, -2.759, 2.983], "end": [5.103, -1.658, 2.683], "center": [4.7585, -2.2085, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3330123780370533, "length": 1.155, "edges": [{"triangle": 67, "edge": 1, "strip": 7}, {"triangle": 104, "edge": 1, "strip": 20}], "ix": 133},
+{"start": [5.103, -1.658, 2.683], "end": [5.193, -0.362, 2.983], "center": [5.148, -1.01, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3333101664654026, "length": 1.155, "edges": [{"triangle": 69, "edge": 2, "strip": 21}, {"triangle": 105, "edge": 0, "strip": 21}], "ix": 134},
+{"start": [5.193, -0.362, 2.983], "end": [4.854, 1.577, 3.154], "center": [5.0235, 0.6074999999999999, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.9758246379676512, "length": 1.799, "edges": [{"triangle": 71, "edge": 2, "strip": 22}, {"triangle": 107, "edge": 2, "strip": 21}], "ix": 135},
+{"start": [4.854, 1.577, 3.154], "end": [3.988, 3.345, 2.983], "center": [4.421, 2.4610000000000003, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.9761125980065004, "length": 1.799, "edges": [{"triangle": 73, "edge": 0, "strip": 22}, {"triangle": 109, "edge": 2, "strip": 22}], "ix": 136},
+{"start": [3.988, 3.345, 2.983], "end": [3.154, 4.341, 2.683], "center": [3.5709999999999997, 3.843, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3332561644335272, "length": 1.155, "edges": [{"triangle": 75, "edge": 1, "strip": 9}, {"triangle": 111, "edge": 1, "strip": 23}], "ix": 137},
+{"start": [3.154, 4.341, 2.683], "end": [1.949, 4.827, 2.983], "center": [2.5515, 4.584, 2.833], "tier": 4, "type": "A", "extends_beyond_corner": null, "original_length": 1.3334995313085038, "length": 1.155, "edges": [{"triangle": 77, "edge": 2, "strip": 24}, {"triangle": 112, "edge": 0, "strip": 24}], "ix": 138},
+{"start": [1.949, 4.827, 2.983], "end": [0.0, 5.104, 3.154], "center": [0.9745, 4.9655000000000005, 3.0685000000000002], "tier": 4, "type": "F", "extends_beyond_corner": null, "original_length": 1.9759987348174088, "length": 1.799, "edges": [{"triangle": 79, "edge": 2, "strip": 10}, {"triangle": 114, "edge": 2, "strip": 24}], "ix": 139},
+{"start": [-0.975, 4.025, 4.341], "end": [0.0, 5.104, 3.154], "center": [-0.4875, 4.564500000000001, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8771880566421681, "length": 1.7, "edges": [{"triangle": 80, "edge": 2, "strip": 10}, {"triangle": 81, "edge": 0, "strip": 10}], "ix": 140},
+{"start": [-0.975, 4.025, 4.341], "end": [-1.95, 4.827, 2.983], "center": [-1.4625, 4.426, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.854182569220194, "length": 1.7, "edges": [{"triangle": 81, "edge": 1, "strip": 10}, {"triangle": 82, "edge": 1, "strip": 11}], "ix": 141},
+{"start": [-2.728, 3.755, 3.802], "end": [-1.95, 4.827, 2.983], "center": [-2.339, 4.291, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5573146759727146, "length": 1.38, "edges": [{"triangle": 82, "edge": 0, "strip": 11}, {"triangle": 83, "edge": 2, "strip": 11}], "ix": 142},
+{"start": [-2.728, 3.755, 3.802], "end": [-3.154, 4.341, 2.683], "center": [-2.941, 4.048, 3.2424999999999997], "tier": 5, "type": "A", "extends_beyond_corner": null, "original_length": 1.3330540124091, "length": 1.155, "edges": [{"triangle": 83, "edge": 0, "strip": 11}, {"triangle": 84, "edge": 1, "strip": 12}], "ix": 143},
+{"start": [-2.728, 3.755, 3.802], "end": [-3.988, 3.342, 2.983], "center": [-3.358, 3.5484999999999998, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5585024863631112, "length": 1.38, "edges": [{"triangle": 84, "edge": 2, "strip": 12}, {"triangle": 85, "edge": 0, "strip": 12}], "ix": 144},
+{"start": [-3.526, 2.171, 4.341], "end": [-3.988, 3.342, 2.983], "center": [-3.7569999999999997, 2.7565, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8517151508803942, "length": 1.7, "edges": [{"triangle": 85, "edge": 2, "strip": 12}, {"triangle": 86, "edge": 0, "strip": 12}], "ix": 145},
+{"start": [-3.526, 2.171, 4.341], "end": [-4.854, 1.577, 3.154], "center": [-4.1899999999999995, 1.8739999999999999, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8776019279921934, "length": 1.7, "edges": [{"triangle": 86, "edge": 1, "strip": 12}, {"triangle": 87, "edge": 0, "strip": 13}], "ix": 146},
+{"start": [-4.129, 0.317, 4.341], "end": [-4.854, 1.577, 3.154], "center": [-4.4915, 0.947, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.876750915811686, "length": 1.7, "edges": [{"triangle": 87, "edge": 2, "strip": 13}, {"triangle": 88, "edge": 0, "strip": 13}], "ix": 147},
+{"start": [-4.129, 0.317, 4.341], "end": [-5.193, -0.362, 2.983], "center": [-4.661, -0.022499999999999992, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539959546881435, "length": 1.7, "edges": [{"triangle": 88, "edge": 1, "strip": 13}, {"triangle": 89, "edge": 1, "strip": 14}], "ix": 148},
+{"start": [-4.414, -1.434, 3.802], "end": [-5.193, -0.362, 2.983], "center": [-4.8035, -0.8979999999999999, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5578144947329255, "length": 1.38, "edges": [{"triangle": 89, "edge": 0, "strip": 14}, {"triangle": 90, "edge": 2, "strip": 14}], "ix": 149},
+{"start": [-4.414, -1.434, 3.802], "end": [-5.103, -1.658, 2.683], "center": [-4.7585, -1.5459999999999998, 3.2424999999999997], "tier": 5, "type": "A", "extends_beyond_corner": null, "original_length": 1.3330633893405073, "length": 1.155, "edges": [{"triangle": 90, "edge": 0, "strip": 14}, {"triangle": 91, "edge": 1, "strip": 15}], "ix": 150},
+{"start": [-4.414, -1.434, 3.802], "end": [-4.414, -2.759, 2.983], "center": [-4.414, -2.0965, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5576861044510861, "length": 1.38, "edges": [{"triangle": 91, "edge": 2, "strip": 15}, {"triangle": 92, "edge": 0, "strip": 15}], "ix": 151},
+{"start": [-3.154, -2.683, 4.341], "end": [-4.414, -2.759, 2.983], "center": [-3.784, -2.721, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8540604089403343, "length": 1.7, "edges": [{"triangle": 92, "edge": 2, "strip": 15}, {"triangle": 93, "edge": 0, "strip": 15}], "ix": 152},
+{"start": [-3.154, -2.683, 4.341], "end": [-3.0, -4.129, 3.154], "center": [-3.077, -3.4059999999999997, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8771257283410718, "length": 1.7, "edges": [{"triangle": 93, "edge": 1, "strip": 15}, {"triangle": 94, "edge": 0, "strip": 16}], "ix": 153},
+{"start": [-1.577, -3.829, 4.341], "end": [-3.0, -4.129, 3.154], "center": [-2.2885, -3.979, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8772048369850318, "length": 1.7, "edges": [{"triangle": 94, "edge": 2, "strip": 16}, {"triangle": 95, "edge": 0, "strip": 16}], "ix": 154},
+{"start": [-1.577, -3.829, 4.341], "end": [-1.26, -5.051, 2.983], "center": [-1.4184999999999999, -4.44, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8541674681646207, "length": 1.7, "edges": [{"triangle": 95, "edge": 1, "strip": 16}, {"triangle": 96, "edge": 1, "strip": 17}], "ix": 155},
+{"start": [-0.0, -4.641, 3.802], "end": [-1.26, -5.051, 2.983], "center": [-0.63, -4.846, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577101784350003, "length": 1.38, "edges": [{"triangle": 96, "edge": 0, "strip": 17}, {"triangle": 97, "edge": 2, "strip": 17}], "ix": 156},
+{"start": [-0.0, -4.641, 3.802], "end": [-0.0, -5.366, 2.683], "center": [-0.0, -5.0035, 3.2424999999999997], "tier": 5, "type": "A", "extends_beyond_corner": null, "original_length": 1.3333364166631014, "length": 1.155, "edges": [{"triangle": 97, "edge": 0, "strip": 17}, {"triangle": 98, "edge": 1, "strip": 18}], "ix": 157},
+{"start": [0.0, -4.641, 3.802], "end": [1.26, -5.051, 2.983], "center": [0.63, -4.846, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577101784350003, "length": 1.38, "edges": [{"triangle": 98, "edge": 2, "strip": 18}, {"triangle": 99, "edge": 0, "strip": 18}], "ix": 158},
+{"start": [1.577, -3.829, 4.341], "end": [1.26, -5.051, 2.983], "center": [1.4184999999999999, -4.44, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8541674681646207, "length": 1.7, "edges": [{"triangle": 99, "edge": 2, "strip": 18}, {"triangle": 100, "edge": 0, "strip": 18}], "ix": 159},
+{"start": [1.577, -3.829, 4.341], "end": [3.0, -4.129, 3.154], "center": [2.2885, -3.979, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8772048369850318, "length": 1.7, "edges": [{"triangle": 100, "edge": 1, "strip": 18}, {"triangle": 101, "edge": 0, "strip": 19}], "ix": 160},
+{"start": [3.154, -2.683, 4.341], "end": [3.0, -4.129, 3.154], "center": [3.077, -3.4059999999999997, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8771257283410718, "length": 1.7, "edges": [{"triangle": 101, "edge": 2, "strip": 19}, {"triangle": 102, "edge": 0, "strip": 19}], "ix": 161},
+{"start": [3.154, -2.683, 4.341], "end": [4.414, -2.759, 2.983], "center": [3.784, -2.721, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8540604089403343, "length": 1.7, "edges": [{"triangle": 102, "edge": 1, "strip": 19}, {"triangle": 103, "edge": 1, "strip": 20}], "ix": 162},
+{"start": [4.414, -1.434, 3.802], "end": [4.414, -2.759, 2.983], "center": [4.414, -2.0965, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5576861044510861, "length": 1.38, "edges": [{"triangle": 103, "edge": 0, "strip": 20}, {"triangle": 104, "edge": 2, "strip": 20}], "ix": 163},
+{"start": [4.414, -1.434, 3.802], "end": [5.103, -1.658, 2.683], "center": [4.7585, -1.5459999999999998, 3.2424999999999997], "tier": 5, "type": "A", "extends_beyond_corner": null, "original_length": 1.3330633893405073, "length": 1.155, "edges": [{"triangle": 104, "edge": 0, "strip": 20}, {"triangle": 105, "edge": 1, "strip": 21}], "ix": 164},
+{"start": [4.414, -1.434, 3.802], "end": [5.193, -0.362, 2.983], "center": [4.8035, -0.8979999999999999, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5578144947329255, "length": 1.38, "edges": [{"triangle": 105, "edge": 2, "strip": 21}, {"triangle": 106, "edge": 0, "strip": 21}], "ix": 165},
+{"start": [4.129, 0.317, 4.341], "end": [5.193, -0.362, 2.983], "center": [4.661, -0.022499999999999992, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539959546881435, "length": 1.7, "edges": [{"triangle": 106, "edge": 2, "strip": 21}, {"triangle": 107, "edge": 0, "strip": 21}], "ix": 166},
+{"start": [4.129, 0.317, 4.341], "end": [4.854, 1.577, 3.154], "center": [4.4915, 0.947, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.876750915811686, "length": 1.7, "edges": [{"triangle": 107, "edge": 1, "strip": 21}, {"triangle": 108, "edge": 0, "strip": 22}], "ix": 167},
+{"start": [3.526, 2.171, 4.341], "end": [4.854, 1.577, 3.154], "center": [4.1899999999999995, 1.8739999999999999, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8776019279921934, "length": 1.7, "edges": [{"triangle": 108, "edge": 2, "strip": 22}, {"triangle": 109, "edge": 0, "strip": 22}], "ix": 168},
+{"start": [3.526, 2.171, 4.341], "end": [3.988, 3.342, 2.983], "center": [3.7569999999999997, 2.7565, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8517151508803942, "length": 1.7, "edges": [{"triangle": 109, "edge": 1, "strip": 22}, {"triangle": 110, "edge": 1, "strip": 23}], "ix": 169},
+{"start": [2.728, 3.755, 3.802], "end": [3.988, 3.342, 2.983], "center": [3.358, 3.5484999999999998, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5585024863631112, "length": 1.38, "edges": [{"triangle": 110, "edge": 0, "strip": 23}, {"triangle": 111, "edge": 2, "strip": 23}], "ix": 170},
+{"start": [2.728, 3.755, 3.802], "end": [3.154, 4.341, 2.683], "center": [2.941, 4.048, 3.2424999999999997], "tier": 5, "type": "A", "extends_beyond_corner": null, "original_length": 1.3330540124091, "length": 1.155, "edges": [{"triangle": 111, "edge": 0, "strip": 23}, {"triangle": 112, "edge": 1, "strip": 24}], "ix": 171},
+{"start": [2.728, 3.755, 3.802], "end": [1.949, 4.827, 2.983], "center": [2.3385000000000002, 4.291, 3.3925], "tier": 5, "type": "B", "extends_beyond_corner": null, "original_length": 1.5578144947329255, "length": 1.38, "edges": [{"triangle": 112, "edge": 2, "strip": 24}, {"triangle": 113, "edge": 0, "strip": 24}], "ix": 172},
+{"start": [0.975, 4.025, 4.341], "end": [1.949, 4.827, 2.983], "center": [1.462, 4.426, 3.662], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8536569261867202, "length": 1.7, "edges": [{"triangle": 113, "edge": 2, "strip": 24}, {"triangle": 114, "edge": 0, "strip": 24}], "ix": 173},
+{"start": [0.0, 5.104, 3.154], "end": [0.975, 4.025, 4.341], "center": [0.4875, 4.564500000000001, 3.7475], "tier": 5, "type": "D", "extends_beyond_corner": null, "original_length": 1.8771880566421681, "length": 1.7, "edges": [{"triangle": 80, "edge": 0, "strip": 10}, {"triangle": 114, "edge": 1, "strip": 24}], "ix": 174},
+{"start": [-0.975, 4.025, 4.341], "end": [-2.728, 3.755, 3.802], "center": [-1.8515000000000001, 3.89, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.853761041774263, "length": 1.7, "edges": [{"triangle": 82, "edge": 2, "strip": 11}, {"triangle": 117, "edge": 0, "strip": 11}], "ix": 175},
+{"start": [-2.728, 3.755, 3.802], "end": [-3.526, 2.171, 4.341], "center": [-3.127, 2.963, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.8537478253527364, "length": 1.7, "edges": [{"triangle": 85, "edge": 1, "strip": 12}, {"triangle": 118, "edge": 2, "strip": 11}], "ix": 176},
+{"start": [-3.526, 2.171, 4.341], "end": [-4.129, 0.317, 4.341], "center": [-3.8274999999999997, 1.244, 4.341], "tier": 6, "type": "E", "extends_beyond_corner": null, "original_length": 1.949596112019102, "length": 1.772, "edges": [{"triangle": 87, "edge": 1, "strip": 13}, {"triangle": 120, "edge": 1, "strip": 25}], "ix": 177},
+{"start": [-4.129, 0.317, 4.341], "end": [-4.414, -1.434, 3.802], "center": [-4.2715, -0.5585, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.8541162315237951, "length": 1.7, "edges": [{"triangle": 89, "edge": 2, "strip": 14}, {"triangle": 122, "edge": 0, "strip": 14}], "ix": 178},
+{"start": [-4.414, -1.434, 3.802], "end": [-3.154, -2.683, 4.341], "center": [-3.784, -2.0585, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.8542173551123933, "length": 1.7, "edges": [{"triangle": 92, "edge": 1, "strip": 15}, {"triangle": 123, "edge": 2, "strip": 14}], "ix": 179},
+{"start": [-3.154, -2.683, 4.341], "end": [-1.577, -3.829, 4.341], "center": [-2.3655, -3.2560000000000002, 4.341], "tier": 6, "type": "E", "extends_beyond_corner": null, "original_length": 1.9494217091229904, "length": 1.772, "edges": [{"triangle": 94, "edge": 1, "strip": 16}, {"triangle": 125, "edge": 1, "strip": 26}], "ix": 180},
+{"start": [-1.577, -3.829, 4.341], "end": [-0.0, -4.641, 3.802], "center": [-0.7885, -4.235, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.8538592179558835, "length": 1.7, "edges": [{"triangle": 96, "edge": 2, "strip": 17}, {"triangle": 127, "edge": 0, "strip": 17}], "ix": 181},
+{"start": [0.0, -4.641, 3.802], "end": [1.577, -3.829, 4.341], "center": [0.7885, -4.235, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.8538592179558835, "length": 1.7, "edges": [{"triangle": 99, "edge": 1, "strip": 18}, {"triangle": 128, "edge": 2, "strip": 17}], "ix": 182},
+{"start": [1.577, -3.829, 4.341], "end": [3.154, -2.683, 4.341], "center": [2.3655, -3.2560000000000002, 4.341], "tier": 6, "type": "E", "extends_beyond_corner": null, "original_length": 1.9494217091229904, "length": 1.772, "edges": [{"triangle": 101, "edge": 1, "strip": 19}, {"triangle": 130, "edge": 1, "strip": 27}], "ix": 183},
+{"start": [3.154, -2.683, 4.341], "end": [4.414, -1.434, 3.802], "center": [3.784, -2.0585, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.8542173551123933, "length": 1.7, "edges": [{"triangle": 103, "edge": 2, "strip": 20}, {"triangle": 132, "edge": 0, "strip": 20}], "ix": 184},
+{"start": [4.414, -1.434, 3.802], "end": [4.129, 0.317, 4.341], "center": [4.2715, -0.5585, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.8541162315237951, "length": 1.7, "edges": [{"triangle": 106, "edge": 1, "strip": 21}, {"triangle": 133, "edge": 2, "strip": 20}], "ix": 185},
+{"start": [4.129, 0.317, 4.341], "end": [3.526, 2.171, 4.341], "center": [3.8274999999999997, 1.244, 4.341], "tier": 6, "type": "E", "extends_beyond_corner": null, "original_length": 1.949596112019102, "length": 1.772, "edges": [{"triangle": 108, "edge": 1, "strip": 22}, {"triangle": 135, "edge": 1, "strip": 28}], "ix": 186},
+{"start": [3.526, 2.171, 4.341], "end": [2.728, 3.755, 3.802], "center": [3.127, 2.963, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.8537478253527364, "length": 1.7, "edges": [{"triangle": 110, "edge": 2, "strip": 23}, {"triangle": 137, "edge": 0, "strip": 23}], "ix": 187},
+{"start": [2.728, 3.755, 3.802], "end": [0.975, 4.025, 4.341], "center": [1.8515000000000001, 3.89, 4.0715], "tier": 6, "type": "D", "extends_beyond_corner": null, "original_length": 1.853761041774263, "length": 1.7, "edges": [{"triangle": 113, "edge": 1, "strip": 24}, {"triangle": 138, "edge": 2, "strip": 23}], "ix": 188},
+{"start": [0.975, 4.025, 4.341], "end": [-0.975, 4.025, 4.341], "center": [0.0, 4.025, 4.341], "tier": 6, "type": "E", "extends_beyond_corner": null, "original_length": 1.95, "length": 1.772, "edges": [{"triangle": 80, "edge": 1, "strip": 10}, {"triangle": 115, "edge": 1, "strip": 29}], "ix": 189},
+{"start": [-0.0, 2.683, 5.366], "end": [-0.975, 4.025, 4.341], "center": [-0.4875, 3.354, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.9499266652876974, "length": 1.772, "edges": [{"triangle": 115, "edge": 0, "strip": 29}, {"triangle": 116, "edge": 2, "strip": 29}], "ix": 190},
+{"start": [-1.854, 2.552, 5.103], "end": [-0.975, 4.025, 4.341], "center": [-1.4145, 3.2885, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.8769693657596016, "length": 1.7, "edges": [{"triangle": 116, "edge": 1, "strip": 29}, {"triangle": 117, "edge": 1, "strip": 11}], "ix": 191},
+{"start": [-1.854, 2.552, 5.103], "end": [-2.728, 3.755, 3.802], "center": [-2.2910000000000004, 3.1535, 4.4525], "tier": 7, "type": "F", "extends_beyond_corner": null, "original_length": 1.9757747847363574, "length": 1.799, "edges": [{"triangle": 117, "edge": 2, "strip": 11}, {"triangle": 118, "edge": 0, "strip": 11}], "ix": 192},
+{"start": [-1.854, 2.552, 5.103], "end": [-3.526, 2.171, 4.341], "center": [-2.69, 2.3615, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765364371628914, "length": 1.7, "edges": [{"triangle": 118, "edge": 1, "strip": 11}, {"triangle": 119, "edge": 1, "strip": 25}], "ix": 193},
+{"start": [-2.552, 0.829, 5.366], "end": [-3.526, 2.171, 4.341], "center": [-3.0389999999999997, 1.5, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.9494268388426372, "length": 1.772, "edges": [{"triangle": 119, "edge": 0, "strip": 25}, {"triangle": 120, "edge": 2, "strip": 25}], "ix": 194},
+{"start": [-2.552, 0.829, 5.366], "end": [-4.129, 0.317, 4.341], "center": [-3.3404999999999996, 0.573, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.9492814060571135, "length": 1.772, "edges": [{"triangle": 120, "edge": 0, "strip": 25}, {"triangle": 121, "edge": 2, "strip": 25}], "ix": 195},
+{"start": [-3.0, -0.975, 5.103], "end": [-4.129, 0.317, 4.341], "center": [-3.5645, -0.32899999999999996, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.877378225078793, "length": 1.7, "edges": [{"triangle": 121, "edge": 1, "strip": 25}, {"triangle": 122, "edge": 1, "strip": 14}], "ix": 196},
+{"start": [-3.0, -0.975, 5.103], "end": [-4.414, -1.434, 3.802], "center": [-3.707, -1.2045, 4.4525], "tier": 7, "type": "F", "extends_beyond_corner": null, "original_length": 1.9755196784643778, "length": 1.799, "edges": [{"triangle": 122, "edge": 2, "strip": 14}, {"triangle": 123, "edge": 0, "strip": 14}], "ix": 197},
+{"start": [-3.0, -0.975, 5.103], "end": [-3.154, -2.683, 4.341], "center": [-3.077, -1.829, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765990514758335, "length": 1.7, "edges": [{"triangle": 123, "edge": 1, "strip": 14}, {"triangle": 124, "edge": 1, "strip": 26}], "ix": 198},
+{"start": [-1.577, -2.171, 5.366], "end": [-3.154, -2.683, 4.341], "center": [-2.3655, -2.4269999999999996, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.949281406057114, "length": 1.772, "edges": [{"triangle": 124, "edge": 0, "strip": 26}, {"triangle": 125, "edge": 2, "strip": 26}], "ix": 199},
+{"start": [-1.577, -2.171, 5.366], "end": [-1.577, -3.829, 4.341], "center": [-1.577, -3.0, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.94925344683548, "length": 1.772, "edges": [{"triangle": 125, "edge": 0, "strip": 26}, {"triangle": 126, "edge": 2, "strip": 26}], "ix": 200},
+{"start": [-0.0, -3.154, 5.103], "end": [-1.577, -3.829, 4.341], "center": [-0.7885, -3.4915000000000003, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770183803042526, "length": 1.7, "edges": [{"triangle": 126, "edge": 1, "strip": 26}, {"triangle": 127, "edge": 1, "strip": 17}], "ix": 201},
+{"start": [-0.0, -3.154, 5.103], "end": [-0.0, -4.641, 3.802], "center": [-0.0, -3.8975, 4.4525], "tier": 7, "type": "F", "extends_beyond_corner": null, "original_length": 1.975796042105561, "length": 1.799, "edges": [{"triangle": 127, "edge": 2, "strip": 17}, {"triangle": 128, "edge": 0, "strip": 17}], "ix": 202},
+{"start": [0.0, -3.154, 5.103], "end": [1.577, -3.829, 4.341], "center": [0.7885, -3.4915000000000003, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.8770183803042526, "length": 1.7, "edges": [{"triangle": 128, "edge": 1, "strip": 17}, {"triangle": 129, "edge": 1, "strip": 27}], "ix": 203},
+{"start": [1.577, -2.171, 5.366], "end": [1.577, -3.829, 4.341], "center": [1.577, -3.0, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.94925344683548, "length": 1.772, "edges": [{"triangle": 129, "edge": 0, "strip": 27}, {"triangle": 130, "edge": 2, "strip": 27}], "ix": 204},
+{"start": [1.577, -2.171, 5.366], "end": [3.154, -2.683, 4.341], "center": [2.3655, -2.4269999999999996, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.949281406057114, "length": 1.772, "edges": [{"triangle": 130, "edge": 0, "strip": 27}, {"triangle": 131, "edge": 2, "strip": 27}], "ix": 205},
+{"start": [3.0, -0.975, 5.103], "end": [3.154, -2.683, 4.341], "center": [3.077, -1.829, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765990514758335, "length": 1.7, "edges": [{"triangle": 131, "edge": 1, "strip": 27}, {"triangle": 132, "edge": 1, "strip": 20}], "ix": 206},
+{"start": [3.0, -0.975, 5.103], "end": [4.414, -1.434, 3.802], "center": [3.707, -1.2045, 4.4525], "tier": 7, "type": "F", "extends_beyond_corner": null, "original_length": 1.9755196784643778, "length": 1.799, "edges": [{"triangle": 132, "edge": 2, "strip": 20}, {"triangle": 133, "edge": 0, "strip": 20}], "ix": 207},
+{"start": [3.0, -0.975, 5.103], "end": [4.129, 0.317, 4.341], "center": [3.5645, -0.32899999999999996, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.877378225078793, "length": 1.7, "edges": [{"triangle": 133, "edge": 1, "strip": 20}, {"triangle": 134, "edge": 1, "strip": 28}], "ix": 208},
+{"start": [2.552, 0.829, 5.366], "end": [4.129, 0.317, 4.341], "center": [3.3404999999999996, 0.573, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.9492814060571135, "length": 1.772, "edges": [{"triangle": 134, "edge": 0, "strip": 28}, {"triangle": 135, "edge": 2, "strip": 28}], "ix": 209},
+{"start": [2.552, 0.829, 5.366], "end": [3.526, 2.171, 4.341], "center": [3.0389999999999997, 1.5, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.9494268388426372, "length": 1.772, "edges": [{"triangle": 135, "edge": 0, "strip": 28}, {"triangle": 136, "edge": 2, "strip": 28}], "ix": 210},
+{"start": [1.854, 2.552, 5.103], "end": [3.526, 2.171, 4.341], "center": [2.69, 2.3615, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.8765364371628914, "length": 1.7, "edges": [{"triangle": 136, "edge": 1, "strip": 28}, {"triangle": 137, "edge": 1, "strip": 23}], "ix": 211},
+{"start": [1.854, 2.552, 5.103], "end": [2.728, 3.755, 3.802], "center": [2.2910000000000004, 3.1535, 4.4525], "tier": 7, "type": "F", "extends_beyond_corner": null, "original_length": 1.9757747847363574, "length": 1.799, "edges": [{"triangle": 137, "edge": 2, "strip": 23}, {"triangle": 138, "edge": 0, "strip": 23}], "ix": 212},
+{"start": [1.854, 2.552, 5.103], "end": [0.975, 4.025, 4.341], "center": [1.4145, 3.2885, 4.7219999999999995], "tier": 7, "type": "D", "extends_beyond_corner": null, "original_length": 1.8769693657596016, "length": 1.7, "edges": [{"triangle": 138, "edge": 1, "strip": 23}, {"triangle": 139, "edge": 1, "strip": 29}], "ix": 213},
+{"start": [0.975, 4.025, 4.341], "end": [-0.0, 2.683, 5.366], "center": [0.4875, 3.354, 4.8535], "tier": 7, "type": "E", "extends_beyond_corner": null, "original_length": 1.9499266652876974, "length": 1.772, "edges": [{"triangle": 115, "edge": 2, "strip": 29}, {"triangle": 139, "edge": 0, "strip": 29}], "ix": 214},
+{"start": [-0.0, 2.683, 5.366], "end": [-1.854, 2.552, 5.103], "center": [-0.927, 2.6174999999999997, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8771377147135477, "length": 1.7, "edges": [{"triangle": 116, "edge": 0, "strip": 29}, {"triangle": 141, "edge": 2, "strip": 29}], "ix": 215},
+{"start": [-1.854, 2.552, 5.103], "end": [-2.552, 0.829, 5.366], "center": [-2.2030000000000003, 1.6905000000000001, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8775254991610633, "length": 1.7, "edges": [{"triangle": 119, "edge": 2, "strip": 25}, {"triangle": 142, "edge": 0, "strip": 25}], "ix": 216},
+{"start": [-2.552, 0.829, 5.366], "end": [-3.0, -0.975, 5.103], "center": [-2.776, -0.07300000000000001, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8773089782984578, "length": 1.7, "edges": [{"triangle": 121, "edge": 0, "strip": 25}, {"triangle": 144, "edge": 2, "strip": 25}], "ix": 217},
+{"start": [-3.0, -0.975, 5.103], "end": [-1.577, -2.171, 5.366], "center": [-2.2885, -1.573, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8773689035455976, "length": 1.7, "edges": [{"triangle": 124, "edge": 2, "strip": 26}, {"triangle": 145, "edge": 0, "strip": 26}], "ix": 218},
+{"start": [-1.577, -2.171, 5.366], "end": [-0.0, -3.154, 5.103], "center": [-0.7885, -2.6624999999999996, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8768023337581399, "length": 1.7, "edges": [{"triangle": 126, "edge": 0, "strip": 26}, {"triangle": 147, "edge": 2, "strip": 26}], "ix": 219},
+{"start": [0.0, -3.154, 5.103], "end": [1.577, -2.171, 5.366], "center": [0.7885, -2.6624999999999996, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8768023337581399, "length": 1.7, "edges": [{"triangle": 129, "edge": 2, "strip": 27}, {"triangle": 148, "edge": 0, "strip": 27}], "ix": 220},
+{"start": [1.577, -2.171, 5.366], "end": [3.0, -0.975, 5.103], "center": [2.2885, -1.573, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8773689035455976, "length": 1.7, "edges": [{"triangle": 131, "edge": 0, "strip": 27}, {"triangle": 150, "edge": 2, "strip": 27}], "ix": 221},
+{"start": [3.0, -0.975, 5.103], "end": [2.552, 0.829, 5.366], "center": [2.776, -0.07300000000000001, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8773089782984578, "length": 1.7, "edges": [{"triangle": 134, "edge": 2, "strip": 28}, {"triangle": 151, "edge": 0, "strip": 28}], "ix": 222},
+{"start": [2.552, 0.829, 5.366], "end": [1.854, 2.552, 5.103], "center": [2.2030000000000003, 1.6905000000000001, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8775254991610633, "length": 1.7, "edges": [{"triangle": 136, "edge": 0, "strip": 28}, {"triangle": 153, "edge": 2, "strip": 28}], "ix": 223},
+{"start": [1.854, 2.552, 5.103], "end": [-0.0, 2.683, 5.366], "center": [0.927, 2.6174999999999997, 5.2345], "tier": 8, "type": "D", "extends_beyond_corner": null, "original_length": 1.8771377147135477, "length": 1.7, "edges": [{"triangle": 139, "edge": 2, "strip": 29}, {"triangle": 154, "edge": 0, "strip": 29}], "ix": 224},
+{"start": [-0.779, 1.072, 5.851], "end": [-0.0, 2.683, 5.366], "center": [-0.3895, 1.8775, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.8540191476896888, "length": 1.7, "edges": [{"triangle": 140, "edge": 2, "strip": 29}, {"triangle": 141, "edge": 0, "strip": 29}], "ix": 225},
+{"start": [-0.779, 1.072, 5.851], "end": [-1.854, 2.552, 5.103], "center": [-1.3165, 1.812, 5.477], "tier": 9, "type": "F", "extends_beyond_corner": null, "original_length": 1.976241129012348, "length": 1.799, "edges": [{"triangle": 141, "edge": 1, "strip": 29}, {"triangle": 142, "edge": 1, "strip": 25}], "ix": 226},
+{"start": [-0.779, 1.072, 5.851], "end": [-2.552, 0.829, 5.366], "center": [-1.6655, 0.9505, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.854131332996668, "length": 1.7, "edges": [{"triangle": 142, "edge": 2, "strip": 25}, {"triangle": 143, "edge": 0, "strip": 25}], "ix": 227},
+{"start": [-1.26, -0.409, 5.851], "end": [-2.552, 0.829, 5.366], "center": [-1.9060000000000001, 0.21, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539506465922981, "length": 1.7, "edges": [{"triangle": 143, "edge": 2, "strip": 25}, {"triangle": 144, "edge": 0, "strip": 25}], "ix": 228},
+{"start": [-1.26, -0.409, 5.851], "end": [-3.0, -0.975, 5.103], "center": [-2.13, -0.692, 5.477], "tier": 9, "type": "F", "extends_beyond_corner": null, "original_length": 1.9767296223813717, "length": 1.799, "edges": [{"triangle": 144, "edge": 1, "strip": 25}, {"triangle": 145, "edge": 1, "strip": 26}], "ix": 229},
+{"start": [-1.26, -0.409, 5.851], "end": [-1.577, -2.171, 5.366], "center": [-1.4184999999999999, -1.2899999999999998, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.8548202069203363, "length": 1.7, "edges": [{"triangle": 145, "edge": 2, "strip": 26}, {"triangle": 146, "edge": 0, "strip": 26}], "ix": 230},
+{"start": [-0.0, -1.325, 5.851], "end": [-1.577, -2.171, 5.366], "center": [-0.7885, -1.7479999999999998, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.8541494006686732, "length": 1.7, "edges": [{"triangle": 146, "edge": 2, "strip": 26}, {"triangle": 147, "edge": 0, "strip": 26}], "ix": 231},
+{"start": [-0.0, -1.325, 5.851], "end": [-0.0, -3.154, 5.103], "center": [-0.0, -2.2395, 5.477], "tier": 9, "type": "F", "extends_beyond_corner": null, "original_length": 1.9760427626951802, "length": 1.799, "edges": [{"triangle": 147, "edge": 1, "strip": 26}, {"triangle": 148, "edge": 1, "strip": 27}], "ix": 232},
+{"start": [-0.0, -1.325, 5.851], "end": [1.577, -2.171, 5.366], "center": [0.7885, -1.7479999999999998, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.8541494006686732, "length": 1.7, "edges": [{"triangle": 148, "edge": 2, "strip": 27}, {"triangle": 149, "edge": 0, "strip": 27}], "ix": 233},
+{"start": [1.26, -0.409, 5.851], "end": [1.577, -2.171, 5.366], "center": [1.4184999999999999, -1.2899999999999998, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.8548202069203363, "length": 1.7, "edges": [{"triangle": 149, "edge": 2, "strip": 27}, {"triangle": 150, "edge": 0, "strip": 27}], "ix": 234},
+{"start": [1.26, -0.409, 5.851], "end": [3.0, -0.975, 5.103], "center": [2.13, -0.692, 5.477], "tier": 9, "type": "F", "extends_beyond_corner": null, "original_length": 1.9767296223813717, "length": 1.799, "edges": [{"triangle": 150, "edge": 1, "strip": 27}, {"triangle": 151, "edge": 1, "strip": 28}], "ix": 235},
+{"start": [1.26, -0.409, 5.851], "end": [2.552, 0.829, 5.366], "center": [1.9060000000000001, 0.21, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.8539506465922981, "length": 1.7, "edges": [{"triangle": 151, "edge": 2, "strip": 28}, {"triangle": 152, "edge": 0, "strip": 28}], "ix": 236},
+{"start": [0.779, 1.072, 5.851], "end": [2.552, 0.829, 5.366], "center": [1.6655, 0.9505, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.854131332996668, "length": 1.7, "edges": [{"triangle": 152, "edge": 2, "strip": 28}, {"triangle": 153, "edge": 0, "strip": 28}], "ix": 237},
+{"start": [0.779, 1.072, 5.851], "end": [1.854, 2.552, 5.103], "center": [1.3165, 1.812, 5.477], "tier": 9, "type": "F", "extends_beyond_corner": null, "original_length": 1.976241129012348, "length": 1.799, "edges": [{"triangle": 153, "edge": 1, "strip": 28}, {"triangle": 154, "edge": 1, "strip": 29}], "ix": 238},
+{"start": [-0.0, 2.683, 5.366], "end": [0.779, 1.072, 5.851], "center": [0.3895, 1.8775, 5.608499999999999], "tier": 9, "type": "D", "extends_beyond_corner": null, "original_length": 1.8540191476896888, "length": 1.7, "edges": [{"triangle": 140, "edge": 0, "strip": 29}, {"triangle": 154, "edge": 2, "strip": 29}], "ix": 239},
+{"start": [-0.779, 1.072, 5.851], "end": [-1.26, -0.409, 5.851], "center": [-1.0195, 0.3315, 5.851], "tier": 10, "type": "B", "extends_beyond_corner": null, "original_length": 1.5571518872608414, "length": 1.38, "edges": [{"triangle": 143, "edge": 1, "strip": 25}, {"triangle": 156, "edge": 1, "strip": 30}], "ix": 240},
+{"start": [-1.26, -0.409, 5.851], "end": [-0.0, -1.325, 5.851], "center": [-0.63, -0.867, 5.851], "tier": 10, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577727690520207, "length": 1.38, "edges": [{"triangle": 146, "edge": 1, "strip": 26}, {"triangle": 157, "edge": 1, "strip": 30}], "ix": 241},
+{"start": [-0.0, -1.325, 5.851], "end": [1.26, -0.409, 5.851], "center": [0.63, -0.867, 5.851], "tier": 10, "type": "B", "extends_beyond_corner": null, "original_length": 1.5577727690520207, "length": 1.38, "edges": [{"triangle": 149, "edge": 1, "strip": 27}, {"triangle": 158, "edge": 1, "strip": 30}], "ix": 242},
+{"start": [1.26, -0.409, 5.851], "end": [0.779, 1.072, 5.851], "center": [1.0195, 0.3315, 5.851], "tier": 10, "type": "B", "extends_beyond_corner": null, "original_length": 1.5571518872608414, "length": 1.38, "edges": [{"triangle": 152, "edge": 1, "strip": 28}, {"triangle": 159, "edge": 1, "strip": 30}], "ix": 243},
+{"start": [0.779, 1.072, 5.851], "end": [-0.779, 1.072, 5.851], "center": [0.0, 1.072, 5.851], "tier": 10, "type": "B", "extends_beyond_corner": null, "original_length": 1.558, "length": 1.38, "edges": [{"triangle": 140, "edge": 1, "strip": 29}, {"triangle": 155, "edge": 1, "strip": 30}], "ix": 244},
+{"start": [-0.0, 0.0, 6.0], "end": [-0.779, 1.072, 5.851], "center": [-0.3895, 0.536, 5.9254999999999995], "tier": 11, "type": "A", "extends_beyond_corner": null, "original_length": 1.3335014060734995, "length": 1.155, "edges": [{"triangle": 155, "edge": 0, "strip": 30}, {"triangle": 156, "edge": 2, "strip": 30}], "ix": 245},
+{"start": [-0.0, 0.0, 6.0], "end": [-1.26, -0.409, 5.851], "center": [-0.63, -0.2045, 5.9254999999999995], "tier": 11, "type": "A", "extends_beyond_corner": null, "original_length": 1.3330723911326046, "length": 1.155, "edges": [{"triangle": 156, "edge": 0, "strip": 30}, {"triangle": 157, "edge": 2, "strip": 30}], "ix": 246},
+{"start": [-0.0, 0.0, 6.0], "end": [-0.0, -1.325, 5.851], "center": [-0.0, -0.6625, 5.9254999999999995], "tier": 11, "type": "A", "extends_beyond_corner": null, "original_length": 1.3333514165440408, "length": 1.155, "edges": [{"triangle": 157, "edge": 0, "strip": 30}, {"triangle": 158, "edge": 2, "strip": 30}], "ix": 247},
+{"start": [-0.0, 0.0, 6.0], "end": [1.26, -0.409, 5.851], "center": [0.63, -0.2045, 5.9254999999999995], "tier": 11, "type": "A", "extends_beyond_corner": null, "original_length": 1.3330723911326046, "length": 1.155, "edges": [{"triangle": 158, "edge": 0, "strip": 30}, {"triangle": 159, "edge": 2, "strip": 30}], "ix": 248},
+{"start": [0.779, 1.072, 5.851], "end": [-0.0, 0.0, 6.0], "center": [0.3895, 0.536, 5.9254999999999995], "tier": 11, "type": "A", "extends_beyond_corner": null, "original_length": 1.3335014060734995, "length": 1.155, "edges": [{"triangle": 155, "edge": 2, "strip": 30}, {"triangle": 159, "edge": 0, "strip": 30}], "ix": 249}]
+//> DOMEDATA
+
+hub_names = [
+  "Taylor Hughes",
+  "Ben Wilson",
+  "Sam Nobs",
+  "Aphex Twin",
+  "Boards of Canada",
+  "M83",
+  "Air",
+  "Derrick May",
+  "Kenny Larkin",
+  "Cari Lekebusch",
+  "Anthony Rother",
+  "Ritchie Hawtin",
+  "Der Dritte Raum",
+  "The Advent",
+  "Dave Clarke",
+  "Underworld",
+  "Kraftwerk",
+  "Hardfloor"
+];
+
+powered_hubs = [
+  3, 4, 7, 8, 11, 12, 15, 16, 19,
+  21, 25, 29, 33, 37,
+  42, 43, 46, 47, 50, 51, 54, 55, 58, 59,
+  61, 64, 67, 70, 73,
+  75, 77, 79, 81, 83, 90
+];
+
+wiring_stats = {
+  "strip_starts": 0,
+  "signal_loops": 0,
+  "jst_links": 0,
+  "unpowered_hubs": 0,
+  "powered_hubs": 0,
+}
+
+
+const CENTER = [650, 650];
+const TWO_PI = 2 * Math.PI;
+
+function colorFromIndex(index){
+  return "rgb(" + 255*Math.sqrt(0.5 + (index & 0x1)/2) + ", "
+    + 255*Math.sqrt(((index >> 1) & 0x3)/3) + ", "
+    + 255*Math.sqrt(((index >> 3) & 0x3)/3) + ")";
+}
+
+function tierColor(tier) {
+  var c = tier*3 + (tier&1)*50;
+  return "rgb(" + c + ", " + c + ", " + c + ")";
+}
+
+function distance(a, b) {
+  if (a.length == 3) {
+    return Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2);
+  } else if (a.length == 2) {
+    return Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2);
+  } else {
+    throw "Invalid length for distance function";
+  }
+}
+
+function arrowhead(x, y, angle_deg, color) {
+  const angle = angle_deg * Math.PI / 180;
+  const size = 10;
+  var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  var angle1 = angle + Math.PI/6;
+  var angle2 = angle - Math.PI/6;
+  var x1 = x - size * Math.cos(angle1);
+  var y1 = y - size * Math.sin(angle1);
+  var x2 = x - size * Math.cos(angle2);
+  var y2 = y - size * Math.sin(angle2);
+  path.setAttribute("d", `M ${x} ${y} L ${x1} ${y1} L ${x2} ${y2} Z`);
+  path.setAttribute("fill", color);
+  return path;
+}
+
+function showStrutInfo(index) {
+  var strut = struts[index];
+  var info = `<h2 id="strut-title">Strut ${index}</h2>
+    <table>
+    <tr><th>Tier</th><td>${strut.tier}</td></tr>
+    <tr><th>Type</th><td>${strut.type}</td></tr>
+    <tr><th>Length</th><td>${strut.length}</td></tr>
+    <tr><th>Original Length</th><td>${strut.original_length}</td></tr>
+    </table>
+    <svg id="strut_svg" width="400" height="100"></svg>
+    <pre>${debugInfoEnabled ? JSON.stringify(strut, null, 2) : ""}</pre>`;
+  var el = document.getElementById("element_info");
+  el.innerHTML = info;
+  var svg = document.getElementById("strut_svg");
+  // add rectangle representing strut
+  var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  rect.setAttribute("x", 100);
+  rect.setAttribute("y", 30);
+  rect.setAttribute("width", 200);
+  rect.setAttribute("height", 40);
+  svg.appendChild(rect);
+
+  // label it with index in center
+  var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.setAttribute("x", 200);
+  text.setAttribute("y", 55);
+  text.setAttribute("text-anchor", "middle");
+  text.setAttribute("font-size", "20");
+  text.setAttribute("font-weight", "bold");
+  text.setAttribute("fill", "white");
+  text.textContent = index;
+  svg.appendChild(text);  
+
+  // orient strut so that the hub on the left as seen from the center
+  //  is drawn on the left
+  var flip = false;
+  var hub1 = hubs[strut.hub_keys[0]];
+  var hub2 = hubs[strut.hub_keys[1]];
+  var hub1_proj = flatten3dCoordinates(hub1.center);
+  var hub2_proj = flatten3dCoordinates(hub2.center);
+  var angle_start = Math.atan2(hub1_proj[1] - CENTER[1], hub1_proj[0] - CENTER[0]);
+  var angle_end = Math.atan2(hub2_proj[1] - CENTER[1], hub2_proj[0]- CENTER[0]);
+  var angle_diff = angle_end - angle_start;
+  if (angle_diff > Math.PI) {
+    angle_diff -= TWO_PI;
+  } else if (angle_diff < -Math.PI) {
+    angle_diff += TWO_PI;
+  }
+  if (angle_diff < 0) {
+    flip = !flip;
+  }
+
+  var left = flip;
+  strut["powered"] = [false, false];
+  for (hub_key of strut.hub_keys) {
+    var hub = hubs[hub_key];
+    var hub_index = hub.ix;
+    strut.powered[left ? 0 : 1] = powered_hubs.includes(hub_index);
+    var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", left ? 30 : 370);
+    circle.setAttribute("cy", 50);
+    circle.setAttribute("r", 25);
+    circle.setAttribute("class", powered_hubs.includes(hub_index) ? "hub powered-hub" : "hub unpowered-hub");
+    svg.appendChild(circle);
+    // label it with hub index in center, hub name at the bottom
+    var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", left ? 30 : 370);
+    text.setAttribute("y", 55);
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("font-size", "14");
+    text.setAttribute("font-weight", "bold");
+    text.setAttribute("fill", "white");
+    text.textContent = hub_index;
+    svg.appendChild(text);
+    var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", left ? 1 : 399);
+    text.setAttribute("y", 90);
+    text.setAttribute("text-anchor", left ? "start" : "end");
+    text.setAttribute("font-size", "12");
+    text.textContent = hub.name;
+    svg.appendChild(text);
+    left = !left;
+  }
+
+  var top = !flip;
+  for (edge of strut.edges)
+  {
+    // draw orange line for strips
+    var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    var len = 200;
+    var startx = 100;
+    var endx = 300;
+    edge["top"] = top;
+    var offset = len * ((strut.length - triangles[edge.triangle].edges[edge.edge].length)/ strut.length);
+    if (edge.alt_start) {
+      if (top) {
+        endx -= offset;
+      } else {
+        startx += offset;
+      }
+    } else if (edge.alt_end) {
+      if (top) {  
+        startx += offset;
+      } else {
+        endx -= offset;
+      }
+    }
+
+    line.setAttribute("x1", startx);
+    line.setAttribute("y1", top ? 30 : 70);
+    line.setAttribute("x2", endx);
+    line.setAttribute("y2", top ? 30 : 70);
+    line.setAttribute("class", "led-strip fat");
+    svg.appendChild(line);
+
+    // label it with edge length in center
+    var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", (startx + endx)/2);
+    text.setAttribute("y", top ? 25 : 75);
+    text.setAttribute("dominant-baseline", top ? "text-after-edge" : "text-before-edge");
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("font-size", "12");
+    text.textContent = Number(triangles[edge.triangle].edges[edge.edge].length.toFixed(3)) + 'm';
+    svg.appendChild(text);
+
+    edge["startx"] = startx;
+    edge["endx"] = endx;
+    top = !top;
+  }
+
+  top = !flip;
+  var both_powered = strut.powered[0] && strut.powered[1];
+  for (i in [0, 1]) {
+    var edge = strut.edges[i];
+    var other_edge = strut.edges[(i+1)%2];
+    if (edge.peers.end && edge.peers.end.strut == strut.ix) {
+      // connects to other strip on same strut
+      // green cubic bezier to self
+      var line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      line.setAttribute("d", `M ${top ? edge.startx : other_edge.endx} 30 C ${top ? 75 : 325} 30 ${top ? 75 : 325} 70 ${top ? other_edge.startx : edge.endx} 70`);
+      line.setAttribute("class", "signal-wire");
+      svg.appendChild(line);
+      svg.appendChild(arrowhead(top ? edge.startx : edge.endx, top ? 70 : 30, top ? 15 : 195, "green"));
+      // always have a power wire on the loops
+      var line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      line.setAttribute("d", `M ${top ? edge.startx : edge.endx} ${top ? 28 : 72} C ${top ? edge.startx-30 : edge.endx+30} ${top ? 28 : 72} ${top ? edge.startx-10 : edge.endx+10} 50 ${top ? edge.startx-40 : edge.endx+40} 50`);
+      line.setAttribute("class", "power-wire");
+      svg.appendChild(line);
+    } else if (edge.peers.end) {
+      // connects to strip on other strut
+      // green quadratic bezier to other strut
+      var line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      var y = top ? 30 : 70;
+      var y2 = top ? 0 : 100;
+      line.setAttribute("d", `M ${top ? edge.startx : edge.endx} ${y} Q ${top ? edge.startx-20 : edge.endx+20} ${y} ${top ? edge.startx-20 : edge.endx+20} ${y2}`);
+      line.setAttribute("class", "signal-wire");
+      svg.appendChild(line);
+      svg.appendChild(arrowhead(top ? edge.startx-20 : edge.endx+20, y2, top ? -90 : 90, "green"));
+      // add label with peer strut index
+      y = top ? 20 : 90;
+      var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", top ? edge.startx - 10 : edge.endx + 10);
+      text.setAttribute("y", y);
+      text.setAttribute("text-anchor", top ? "start" : "end");
+      text.setAttribute("font-size", "14");
+      text.setAttribute("fill", "green");
+      text.textContent = edge.peers.end.strut;
+      svg.appendChild(text);
+      // have a power wire if adjacent hub is powered
+      if (strut.powered[top ? 0 : 1]) {
+        var line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        line.setAttribute("d", `M ${top ? edge.startx : edge.endx} ${top ? 28 : 72} C ${top ? edge.startx-30 : edge.endx+30} ${top ? 28 : 72} ${top ? edge.startx-10 : edge.endx+10} 50 ${top ? edge.startx-40 : edge.endx+40} 50`);
+        line.setAttribute("class", "power-wire");
+        svg.appendChild(line);
+      }
+    }
+    if (edge.peers.start && edge.peers.start.strut != strut.ix) {
+      // connects to strip on other strut
+      // green quadratic bezier to other strut
+      var line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      var y = top ? 30 : 70;
+      var y2 = top ? 0 : 100;
+      line.setAttribute("d", `M ${top ? edge.endx : edge.startx} ${y} Q ${top ? edge.endx+20 : edge.startx-20} ${y} ${top ? edge.endx+20 : edge.startx-20} ${y2}`);
+      line.setAttribute("class", "signal-wire");
+      svg.appendChild(line);
+      svg.appendChild(arrowhead(top ? edge.endx : edge.startx, y, top ? 165 : -15, "green"));
+      // add label with peer strut index
+      y = top ? 20 : 90;
+      var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", top ? edge.endx + 10 : edge.startx - 10);
+      text.setAttribute("y", y);
+      text.setAttribute("text-anchor", top ? "end" : "start");
+      text.setAttribute("font-size", "14");
+      text.setAttribute("fill", "green");
+      text.textContent = edge.peers.start.strut;
+      svg.appendChild(text);
+    } 
+
+    if (!edge.peers.start) {
+      // beginning of strip, always powered
+      var line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      line.setAttribute("d", `M ${top ? edge.endx : edge.startx} ${top ? 28 : 72} C ${top ? edge.endx+30 : edge.startx-30} ${top ? 28 : 72} ${top ? edge.endx+10 : edge.startx-10} 50 ${top ? edge.endx+40 : edge.startx-40} 50`);
+      line.setAttribute("class", "power-wire");
+      svg.appendChild(line);
+      // beginning of strip, draw green circle
+      var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", top ? edge.endx : edge.startx);
+      circle.setAttribute("cy", top ? 30 : 70);
+      circle.setAttribute("r", 8);
+      circle.setAttribute("class", "strip-start");
+      svg.appendChild(circle);
+    }
+
+    if (!edge.peers.end && strut.tier > 0) {
+      // end of strip, always powered, except for tier 0
+      var line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      line.setAttribute("d", `M ${top ? edge.startx : edge.endx} ${top ? 28 : 72} C ${top ? edge.startx-30 : edge.endx+30} ${top ? 28 : 72} ${top ? edge.startx-10 : edge.endx+10} 50 ${top ? edge.startx-40 : edge.endx+40} 50`);
+      line.setAttribute("class", "power-wire");
+      svg.appendChild(line);
+    }
+    top = !top;
+  }
+}
+
+function showTriangleInfo(index) {
+  var triangle = triangles[index];
+  var info = `<h2>Triangle ${triangle.id}</h2>
+    <table>
+    <tr><th>Strip</th><td>${triangle.strip}</td></tr>
+    </table>
+    <pre>${debugInfoEnabled ? JSON.stringify(triangle, null, 2) : ""}</pre>`;
+  document.getElementById("element_info").innerHTML = info;
+}
+
+function normalize(v) {
+    const len = Math.hypot(v[0], v[1], v[2]);
+    if (len === 0) return [0, 0, 0];
+    return [v[0] / len, v[1] / len, v[2] / len];
+}
+
+function dot(a, b) {
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+
+function cross(a, b) {
+    return [
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0]
+    ];
+}
+
+function subtract(a, b) {
+    return [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+}
+
+function scale(v, s) {
+    return [v[0]*s, v[1]*s, v[2]*s];
+}
+
+function projectOntoPlane(v, normal) {
+    const d = dot(v, normal);
+    return subtract(v, scale(normal, d));
+}
+
+function computeProjectedAngles(P, points) {
+    const origin = [0, 0, 0];
+
+    // Plane normal
+    const n = normalize(subtract(P, origin));
+
+    // Z-up
+    const up = [0, 0, 1];
+
+    // Define north
+    let north = projectOntoPlane(up, n);
+    let northLen = Math.hypot(...north);
+
+    if (northLen === 0) {
+        north = projectOntoPlane([1, 0, 0], n);
+        northLen = Math.hypot(...north);
+    }
+
+    north = [north[0]/northLen, north[1]/northLen, north[2]/northLen];
+
+    // IMPORTANT: flipped cross product because X is reversed
+    const east = normalize(cross(north, n));
+
+    const angles = [];
+
+    for (const Q of points) {
+        const d = subtract(Q, P);
+        let dProj = projectOntoPlane(d, n);
+        dProj = normalize(dProj);
+
+        const x = dot(dProj, east);
+        const y = dot(dProj, north);
+
+        // 0° = north, positive clockwise
+        const angleRad = Math.atan2(x, y);
+        const angleDeg = angleRad * 180 / Math.PI;
+
+        angles.push(normalizeDeg(angleDeg));
+    }
+
+    return angles;
+}
+
+
+const FULL = 360;
+
+function normalizeDeg(angle) {
+  return ((angle % FULL) + FULL) % FULL;
+}
+
+function circularDistanceDeg(a, b) {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, FULL - diff);
+}
+
+function minDistanceDeg(A, B, theta = 0) {
+  let minDist = Infinity;
+
+  for (const b of B) {
+    const rotated = normalizeDeg(b + theta);
+
+    for (const a of A) {
+      const d = circularDistanceDeg(rotated, a);
+      if (d < minDist) {
+        minDist = d;
+      }
+    }
+  }
+
+  return minDist;
+}
+
+function bestRotationIfAboveThresholdDeg(A, B, thresholdDeg) {
+  // Early check at 0°
+  const baseMin = minDistanceDeg(A, B, 0);
+
+  if (baseMin >= thresholdDeg) {
+    return {rotationDeg: 0, minDistanceDeg: baseMin};
+  }
+
+  // Sort A
+  A = [...A].map(normalizeDeg).sort((x, y) => x - y);
+  B = B.map(normalizeDeg);
+
+  // Midpoints of gaps in A
+  const midpoints = [];
+  for (let i = 0; i < A.length; i++) {
+    const a1 = A[i];
+    const a2 = A[(i + 1) % A.length];
+    const gap = normalizeDeg(a2 - a1);
+    midpoints.push(normalizeDeg(a1 + gap / 2));
+  }
+
+  let bestTheta = 0;
+  let bestScore = baseMin;
+
+  for (const m of midpoints) {
+    for (const b of B) {
+      const theta = normalizeDeg(m - b);
+      const score = minDistanceDeg(A, B, theta);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestTheta = theta;
+      }
+    }
+  }
+
+  return {
+    rotationDeg: bestTheta,
+    minDistanceDeg: bestScore
+  };
+}
+
+function showHubInfo(key) {
+  var hub = hubs[key];
+  var info = ` <h2>${hub.name}</h2>
+               <table><tr><th>Index</th><td>${hub.ix}</td></tr>
+                      <tr><th>Powered</th><td>${powered_hubs.includes(hub.ix) ? "Yes" : "No"}</td></tr>
+                      <tr><th>Position</th><td>${hub.center}</td></tr>
+                      <tr><th>Tier</th><td>${hub.tier}</td></tr>
+               </table>
+               <table>
+               <tr><th>Strut</th><th>Type</th><th>Tier</th><th>To</th></tr>`;
+  for (strut_info of hub.struts) {
+    var strut = strut_info.strut;
+    info += `<tr><td>${strut.ix}</td>
+                 <td>${strut.type}</td>
+                 <td>${strut.tier}</td>
+                 <td>${strut_info.other_endpoint}</td></tr>`;
+  }
+  info += "</table><svg id='hub_svg' width='400' height='400'></svg>";
+  document.getElementById("element_info").innerHTML = info;
+  // add an svg circle
+  const center = {x: 200, y: 200};
+  const radius = 180;
+  var spoke_angles = [0, 130, 230];
+  var rotate = 0;
+
+  var endpoints = [];
+  for (strut_info of hub.struts) {
+    endpoints.push(strut_info.other_endpoint);
+  }
+  var strut_angles = computeProjectedAngles(hub.center, endpoints);
+
+  var min_tier = 999;
+  for (strut_info of hub.struts) {
+    if (strut_info.strut.tier < min_tier) {
+      min_tier = strut_info.strut.tier;
+    }
+  }
+  if (hub.struts.length == 5 && min_tier > 2 && min_tier < 6) {
+    // it's one of the lower pentagons
+    rotate = 180;
+  } else {
+    var bestRotation = bestRotationIfAboveThresholdDeg(strut_angles, spoke_angles, 10);
+    if (bestRotation) {
+      rotate = bestRotation.rotationDeg;
+    } else {
+      console.log("No significant rotation found for hub " + key);
+    }
+  }
+  
+  var svg = document.getElementById("hub_svg");
+  var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("cx", center.x);
+  circle.setAttribute("cy", center.y);
+  circle.setAttribute("r", radius);
+  circle.setAttribute("fill", "none");
+  circle.setAttribute("stroke", "firebrick");
+  circle.setAttribute("stroke-width", "30");
+  svg.appendChild(circle);
+
+  var line1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line1.setAttribute("x1", center.x);
+  line1.setAttribute("y1", center.y);
+  line1.setAttribute("x2", center.x + radius * Math.sin((spoke_angles[0]) * Math.PI / 180));
+  line1.setAttribute("y2", center.y - radius * Math.cos((spoke_angles[0]) * Math.PI / 180));
+  line1.setAttribute("stroke", "firebrick");
+  line1.setAttribute("stroke-width", "30");
+  svg.appendChild(line1);
+
+  var line2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line2.setAttribute("x1", center.x);
+  line2.setAttribute("y1", center.y);
+  line2.setAttribute("x2", center.x + radius * Math.sin((spoke_angles[1]) * Math.PI / 180));
+  line2.setAttribute("y2", center.y - radius * Math.cos((spoke_angles[1]) * Math.PI / 180));
+  line2.setAttribute("stroke", "firebrick");
+  line2.setAttribute("stroke-width", "30");
+  svg.appendChild(line2);
+
+  var line3 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line3.setAttribute("x1", center.x);
+  line3.setAttribute("y1", center.y);
+  line3.setAttribute("x2", center.x + radius * Math.sin((spoke_angles[2]) * Math.PI / 180));
+  line3.setAttribute("y2", center.y - radius * Math.cos((spoke_angles[2]) * Math.PI / 180));
+  line3.setAttribute("stroke", "firebrick");
+  line3.setAttribute("stroke-width", "30");
+  svg.appendChild(line3);
+
+  var namelabel = document.createElementNS("http://www.w3.org/2000/svg","text");
+  namelabel.setAttribute("x", center.x);
+  namelabel.setAttribute("y", center.y);
+  namelabel.setAttribute("font-size", 18);
+  namelabel.setAttribute("fill", "white");
+  namelabel.setAttribute("font-weight", "bold");
+  namelabel.setAttribute("dominant-baseline", "middle");
+  namelabel.setAttribute(
+      "transform",
+      `rotate(${spoke_angles[0]-90}, ${center.x}, ${center.y})`
+  );
+  namelabel.textContent = hub.name;
+  svg.appendChild(namelabel);
+
+
+  for (let i = 0; i < strut_angles.length; i++) {
+    const angle = strut_angles[i] - rotate;
+    const r = 180;
+    const cx = 200;
+    const cy = 200;
+    
+    const rad = angle * Math.PI / 180;
+
+    const x = cx + r * Math.sin(rad);
+    const y = cy - r * Math.cos(rad);
+
+    const label = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "text"
+    );
+
+    label.setAttribute("x", x);
+    label.setAttribute("y", y);
+    label.setAttribute("font-size", "20");
+    label.setAttribute("fill", "white");
+    label.setAttribute("font-weight", "bold");
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("dominant-baseline", "middle");
+
+    label.setAttribute(
+      "transform",
+      `rotate(${angle}, ${x}, ${y})`
+    );
+
+    label.textContent = `${hub.struts[i].strut.ix}`;
+    svg.appendChild(label);
+  }
+}
+
+function flatten3dCoordinates(obj_or_arr)
+{
+  if (Array.isArray(obj_or_arr)) {
+    return flatten3dCoordinatesRaw(obj_or_arr[0], obj_or_arr[1], obj_or_arr[2]);
+  }
+  else {
+    return flatten3dCoordinatesRaw(obj_or_arr.x, obj_or_arr.y, obj_or_arr.z);
+  }
+}
+
+function flatten3dCoordinatesRaw(x, y, z) {
+  var scale = 100;
+  var zskew = 5;
+  x = CENTER[0] + x * (scale - z * zskew);
+  y = CENTER[1] - y * (scale - z * zskew);
+  return [x, y];
+}
+
+function centroid(vertices_arr) {
+  var centroid = {x: 0, y: 0, z: 0};
+  for (value of vertices_arr) {
+    centroid.x += value[0];
+    centroid.y += value[1];
+    centroid.z += value[2];
+  }
+  centroid.x /= vertices_arr.length;
+  centroid.y /= vertices_arr.length;
+  centroid.z /= vertices_arr.length;
+  return centroid;
+}
+
+function hubKey(endpoint) {
+  return Math.round(endpoint[0] * 10) + "," + Math.round(endpoint[1] * 10) + "," + Math.round(endpoint[2] * 10);
+}
+
+var hubs = {};
+function addToHub(strut) {
+  var endpoints = [strut.start, strut.end];
+  strut["hub_keys"] = [];
+  for (endpoint of endpoints) {
+    var key = hubKey(endpoint);
+    strut.hub_keys.push(key);
+    var other_endpoint = (endpoint === strut.start) ? strut.end : strut.start;
+    if (!(key in hubs)) {
+      hubs[key] = { center: endpoint, struts: [], tier: 12};
+    }
+    if (strut.tier % 2 == 0) { // even tier must be horizontal, so we use the tier for the hub
+      hubs[key].tier = strut.tier;
+    }
+    hubs[key].struts.push({
+      other_endpoint: other_endpoint,
+      strut: strut
+    });
+  }
+}
+
+function findHub(endpoint) {
+  var key = hubKey(endpoint);
+  return hubs[key];
+}
+
+function orderAndNameHubs() {
+  var hub_keys = Object.keys(hubs);
+  hub_keys.sort((a, b) => {
+    var ha = hubs[a];
+    var hb = hubs[b];
+    if (ha.tier != hb.tier) {
+      return ha.tier - hb.tier;
+    }
+    // if equal, order by angle
+    return Math.atan2(ha.center[0], -ha.center[1]) - Math.atan2(hb.center[0], -hb.center[1]);
+  });
+  for (let i = 0; i < hub_keys.length; i++) {
+    const key = hub_keys[i];
+    hubs[key].ix = i;
+    hubs[key].name = hub_names[i] || `Hub ${i}`;
+    hubs[key].powered = powered_hubs.includes(i);
+  }
+}
+
+var svg = document.getElementById("svg");
+
+for (triangle of triangles) {
+  if (triangle.no_leds) {
+    continue;
+  }
+  // reorder vertex coordinates from xyz to xzy,
+  //  essentially OpenGL style to SVG style, so that the y coordinate is vertical in the SVG
+  for (let i = 0; i < triangle.vertices.length; i++) {
+    const v = triangle.vertices[i];
+    triangle.vertices[i] = [v[0], v[2], v[1]];
+  }
+
+  var polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+  svg.appendChild(polygon);
+
+  for (value of triangle.vertices) {
+    var point = svg.createSVGPoint();
+    [point.x, point.y] = flatten3dCoordinates(value);
+    polygon.points.appendItem(point);
+  }
+
+  var centr = centroid(triangle.vertices);
+  polygon.setAttribute("fill", colorFromIndex(triangle.strip));
+  polygon.setAttribute("data-triangle-ix", triangle.id);
+  polygon.addEventListener("mouseover", function() {
+    var index = this.getAttribute("data-triangle-ix");
+    showTriangleInfo(index);
+  });
+
+  // label the triangle with triangle_ix
+  var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  [x, y] = flatten3dCoordinates(centr);
+  text.setAttribute("x", x);
+  text.setAttribute("y", y);
+  text.setAttribute("font-size", "14");
+  text.setAttribute("text-anchor", "middle");
+  text.setAttribute("alignment-baseline", "middle");
+  text.textContent = triangle.id;
+  svg.appendChild(text);
+
+  // label triangle corners at the midpoint between corner and centroid
+  /*
+  corner_ix = 0;
+  for (value of triangle.vertices) {
+    var point = svg.createSVGPoint();
+    [point.x, point.y] = flatten3dCoordinates([
+      (value[0] + centr.x) / 2,
+      (value[1] + centr.y) / 2,
+      (value[2] + centr.z) / 2
+    ]);
+    var corner_label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    corner_label.setAttribute("x", point.x);
+    corner_label.setAttribute("y", point.y);
+    corner_label.setAttribute("font-size", "10");
+    corner_label.setAttribute("text-anchor", "middle");
+    corner_label.setAttribute("fill", "black");
+    corner_label.textContent = `${corner_ix}`;
+    svg.appendChild(corner_label);
+    corner_ix++;
+  } */
+
+}
+
+var i = 0;
+for (strut of struts) {
+  addToHub(strut);
+
+  [start, end] = [flatten3dCoordinates(strut.start), flatten3dCoordinates(strut.end)];
+
+  // if extends beyond triangle, draw a thin line to the extended point
+  if (strut.extends_beyond_corner) {
+    var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", start[0]);
+    line.setAttribute("y1", start[1]);
+    line.setAttribute("x2", end[0]);
+    line.setAttribute("y2", end[1]);
+    line.setAttribute("stroke", "black");
+    line.setAttribute("stroke-width", "1");
+    svg.appendChild(line);
+  }
+
+  var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  // shorten the lines
+  var dirvec = [end[0] - start[0], end[1] - start[1]];
+  var length = Math.sqrt(dirvec[0]*dirvec[0] + dirvec[1]*dirvec[1]);
+  dirvec[0] /= length;
+  dirvec[1] /= length;
+   // we need a bit more space along the bottom tiers to fit the led strips
+  var offset = Math.min(strut.tier < 2 ? 35 : 30, length / 2 - 10);
+  start[0] += dirvec[0] * offset;
+  start[1] += dirvec[1] * offset;
+  end[0] -= dirvec[0] * offset;
+  end[1] -= dirvec[1] * offset;
+  strut["shortened_start"] = start;
+  strut["shortened_end"] = end;
+  strut["projected_start"] = flatten3dCoordinates(strut.start);
+  strut["projected_end"] = flatten3dCoordinates(strut.end);
+  line.setAttribute("x1", start[0]);
+  line.setAttribute("y1", start[1]);
+  line.setAttribute("x2", end[0]);
+  line.setAttribute("y2", end[1]);
+  line.setAttribute("stroke", tierColor(strut.tier));
+  var width = 14;
+  line.setAttribute("stroke-width", width);
+  line.setAttribute("data-strut-index", i);
+  line.addEventListener("mouseover", function() {
+    var index = this.getAttribute("data-strut-index");
+    showStrutInfo(index);
+  });
+  svg.appendChild(line);
+
+  // calculate normal to line from start to end
+  var dx = end[0] - start[0];
+  var dy = end[1] - start[1];
+  var length = Math.sqrt(dx*dx + dy*dy);
+  var nx = -dy / length;
+  var ny = dx / length;
+  strut["led_strips"] = [
+    {"start": [start[0] + nx * width/2, start[1] + ny * width/2], "end":   [end[0] + nx * width/2, end[1] + ny * width/2]},
+    {"end":   [start[0] - nx * width/2, start[1] - ny * width/2], "start": [end[0] - nx * width/2, end[1] - ny * width/2]}
+  ]
+  
+  var j = 0;
+  for (edge of strut.edges) {
+    edge["peers"] = {} // we'll fill this later when we place the wires
+    var sign = (j == 0) ? 1 : -1;
+    if (edge.alt_start) {
+      strut.led_strips[j].start = flatten3dCoordinates(edge.alt_start);
+      strut.led_strips[j].start[0] += sign * (nx * width/2 + ny * width*0.7);
+      strut.led_strips[j].start[1] += sign * (ny * width/2 - nx * width*0.7);
+    }
+    if (edge.alt_end) {
+      strut.led_strips[j].end = flatten3dCoordinates(edge.alt_end);
+      strut.led_strips[j].end[0] += sign * (nx * width/2 - ny * width*0.7);
+      strut.led_strips[j].end[1] += sign * (ny * width/2 + nx * width*0.7);
+    }
+    j++;
+  }
+
+  j = 0;
+  for (led_strip of strut.led_strips) {
+    var led_line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    led_line.setAttribute("x1", led_strip.start[0]);
+    led_line.setAttribute("y1", led_strip.start[1]);
+    led_line.setAttribute("x2", led_strip.end[0]);
+    led_line.setAttribute("y2", led_strip.end[1]);
+    led_line.setAttribute("class", "led-strip");
+    svg.appendChild(led_line);
+
+    // draw a small circle at the beginning of the strip
+    if (triangles[strut.edges[j].triangle].edges[strut.edges[j].edge].first_led == 0) {
+      var start_circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      start_circle.setAttribute("cx", led_strip.start[0]);
+      start_circle.setAttribute("cy", led_strip.start[1]);
+      start_circle.setAttribute("r", "4");
+      start_circle.setAttribute("class", "strip-start");
+      svg.appendChild(start_circle);
+      wiring_stats.strip_starts++;
+    }
+
+    // add a label for the led ix at each end
+    /*
+    var led_label_start = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    led_label_start.setAttribute("x", led_strip.start[0]);
+    led_label_start.setAttribute("y", led_strip.start[1]);
+    led_label_start.setAttribute("font-size", "6");
+    led_label_start.setAttribute("text-anchor", "middle");
+    led_label_start.setAttribute("fill", "white");
+    led_label_start.textContent = triangles[strut.edges[j].triangle].edges[strut.edges[j].edge].first_led;
+    svg.appendChild(led_label_start);
+
+    var led_label_end = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    led_label_end.setAttribute("x", led_strip.end[0]);
+    led_label_end.setAttribute("y", led_strip.end[1]);
+    led_label_end.setAttribute("font-size", "6");
+    led_label_end.setAttribute("text-anchor", "middle");
+    led_label_end.setAttribute("fill", "white");
+    led_label_end.textContent = triangles[strut.edges[j].triangle].edges[strut.edges[j].edge].last_led;
+    svg.appendChild(led_label_end);*/
+
+    // if we don't have a second edge, skip
+    if (strut.edges.length < 2) {
+      break;
+    }
+    j++;
+  }
+
+  // label the strut with the index in sorted order. The label is rotated to be parallel to the strut, but never upside down (i.e. the text is always right side up).
+  var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  [x, y] = flatten3dCoordinates(strut.center);
+  text.setAttribute("x", x);
+  text.setAttribute("y", y+1);
+  text.setAttribute("font-size", "12");
+  text.setAttribute("text-anchor", "middle");
+  text.setAttribute("font-weight", "bold");
+  text.setAttribute("fill", "white");
+  text.setAttribute("alignment-baseline", "middle");
+  var angle = Math.atan2(end[1] - start[1], end[0] - start[0]) * 180 / Math.PI;
+  if (angle > 90 || angle < -90) {
+    angle += 180;
+  }
+  text.setAttribute("transform", "rotate(" + angle + " " + x + " " + y + ")");
+  text.setAttribute("data-strut-index", i);
+  text.addEventListener("mouseover", function() {
+    var index = this.getAttribute("data-strut-index");
+    showStrutInfo(index);
+  });
+  text.textContent = strut.ix;
+  svg.appendChild(text);
+  i++;
+}
+
+// now draw the connections between the strips on the struts as a cubic bezier curve
+for (strut of struts) {
+  var i = 0;
+  for (edge of strut.edges) {
+    var wire_start = strut.led_strips[i].end;
+    var dirvec = [wire_start[0] - strut.led_strips[i].start[0], wire_start[1] - strut.led_strips[i].start[1]];
+    var length = Math.sqrt(dirvec[0]*dirvec[0] + dirvec[1]*dirvec[1]);
+    dirvec[0] /= length;
+    dirvec[1] /= length;
+    var control_strength = 10;
+    var control_point1 = [wire_start[0] + dirvec[0] * control_strength, wire_start[1] + dirvec[1] * control_strength];
+    var strip_ix = edge.strip;
+    var led_ix = triangles[edge.triangle].edges[edge.edge].last_led + 1;
+    // find the other edge
+    for (connecting_strut of struts) {
+      var j = 0;
+      for (connecting_edge of connecting_strut.edges) {
+        if (connecting_edge.strip == strip_ix && triangles[connecting_edge.triangle].edges[connecting_edge.edge].first_led == led_ix) {
+
+          if (connecting_strut.ix == strut.ix) {
+            wiring_stats.signal_loops++;
+          } else {
+            wiring_stats.jst_links++;
+          }
+
+          var wire_end = connecting_strut.led_strips[j].start;
+          var dirvec_end = [wire_end[0] - connecting_strut.led_strips[j].end[0], wire_end[1] - connecting_strut.led_strips[j].end[1]];
+          var length_end = Math.sqrt(dirvec_end[0]*dirvec_end[0] + dirvec_end[1]*dirvec_end[1]);
+          dirvec_end[0] /= length_end;
+          dirvec_end[1] /= length_end;
+          var control_point2 = [wire_end[0] + dirvec_end[0] * control_strength, wire_end[1] + dirvec_end[1] * control_strength];
+          var wire = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          var d = "M " + wire_start[0] + " " + wire_start[1] + " C " + control_point1[0] + " " + control_point1[1] + ", " + control_point2[0] + " " + control_point2[1] + ", " + wire_end[0] + " " + wire_end[1];
+          wire.setAttribute("d", d);
+          wire.setAttribute("class", "signal-wire");
+          svg.appendChild(wire);
+
+          edge["peers"]["end"] = {"strut": connecting_strut.ix, "edge": j};
+          connecting_edge["peers"]["start"] = {"strut": strut.ix, "edge": i};
+        }
+        j++;
+      }
+    }
+    i++;
+  } 
+}
+
+
+
+orderAndNameHubs();
+for (hub in hubs) {
+  if (hubs[hub].struts.length < 2) {
+    continue;
+  }
+  var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  svg.appendChild(circle);
+  [x, y] = flatten3dCoordinates(hubs[hub].center);
+  circle.setAttribute("cx", x);
+  circle.setAttribute("cy", y);
+  circle.setAttribute("r", "10");
+  circle.setAttribute("class", "hub " + (hubs[hub].powered ? "powered-hub" : "unpowered-hub"));
+  circle.setAttribute("data-hub-key", hub);
+  // add a label in the center of the circle with the hub.ix
+  var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.setAttribute("x", x);
+  text.setAttribute("y", y);
+  text.setAttribute("font-size", "10");
+  text.setAttribute("text-anchor", "middle");
+  text.setAttribute("alignment-baseline", "middle");
+  text.setAttribute("fill", "white");
+  text.textContent = hubs[hub].ix;
+  svg.appendChild(text);
+  circle.addEventListener("mouseover", function() {
+    var key = this.getAttribute("data-hub-key");
+    showHubInfo(key);
+  });
+  if (hubs[hub].powered) {
+    wiring_stats.powered_hubs++;
+  } else {
+    wiring_stats.unpowered_hubs++;
+  }
+}
+
+// Scale the legend and sidebar proportionally with the SVG (SVG is 1300×1300 logical units)
+const svgScale = Math.min(window.innerWidth, window.innerHeight) / 1300;
+document.getElementById('legend').style.transform = `scale(${svgScale})`;
+// zoom shrinks the sidebar content to match the SVG scale.
+// Compensate height and width so the sidebar fills all remaining viewport space after the SVG.
+const sidebar = document.getElementById('sidebar');
+const svgRenderedSize = svgScale * 1300; // px the SVG actually occupies (square)
+sidebar.style.zoom = svgScale;
+sidebar.style.height = Math.round(window.innerHeight / svgScale) + 'px';
+sidebar.style.width = Math.round((window.innerWidth - svgRenderedSize) / svgScale) + 'px';
+
+stats = document.getElementById("stats");
+stats.innerHTML = `<h2>Wiring Stats</h2>
+<table>
+<tr><th>Strip Starts</th><td>${wiring_stats.strip_starts}</td></tr>
+<tr><th>JST Links</th><td>${wiring_stats.jst_links}</td></tr>
+<tr><th>Signal Loops</th><td>${wiring_stats.signal_loops}</td></tr>
+<tr><th>Powered Hubs</th><td>${wiring_stats.powered_hubs}</td></tr>
+<tr><th>Unpowered Hubs</th><td>${wiring_stats.unpowered_hubs}</td></tr>
+</table>`;
+
+const TRIANGLE_OPACITY_STORAGE_KEY = "toggle-triangle-opacity-enabled";
+const DEBUG_INFO_STORAGE_KEY = "debug-info-enabled";
+
+function setTriangleFillOpacity(enabled) {
+  const opacity = enabled ? "1" : "0";
+  const polygons = document.querySelectorAll("#svg polygon");
+  for (const polygon of polygons) {
+    polygon.setAttribute("fill-opacity", opacity);
+  }
+}
+
+(function initTriangleOpacityToggle() {
+  const toggle = document.getElementById("toggle-triangle-opacity");
+  if (!toggle) return;
+
+  // default = true (100%) if no saved value exists
+  const saved = localStorage.getItem(TRIANGLE_OPACITY_STORAGE_KEY);
+  const enabled = saved === null ? true : saved === "true";
+
+  toggle.checked = enabled;
+  setTriangleFillOpacity(enabled);
+
+  toggle.addEventListener("change", function () {
+    const isEnabled = this.checked;
+    setTriangleFillOpacity(isEnabled);
+    localStorage.setItem(TRIANGLE_OPACITY_STORAGE_KEY, String(isEnabled));
+  });
+})();
+
+debugInfoEnabled = false;
+(function initDebugInfoToggle() {
+  const toggle = document.getElementById("toggle-debug-info");
+  if (!toggle) return;
+
+  // default = false if no saved value exists
+  const saved = localStorage.getItem(DEBUG_INFO_STORAGE_KEY);
+  debugInfoEnabled = saved === "true";
+
+  toggle.checked = debugInfoEnabled;
+
+  toggle.addEventListener("change", function () {
+    debugInfoEnabled = this.checked;
+    localStorage.setItem(DEBUG_INFO_STORAGE_KEY, String(debugInfoEnabled));
+  });
+})();
+
+</script>
+</body>
+</html>
