@@ -8,12 +8,13 @@ polygon {
 html, body {
   height: 100%;
   margin: 0;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 #container {
   display: flex;
   height: 100vh;
   align-items: flex-start;
+  position: relative;
 }
 #sidebar {
   display: flex;
@@ -53,6 +54,40 @@ table {
   width: 100%;
   box-sizing: border-box;
 }
+
+div#strut_list {
+  margin: 20px;
+}
+
+table#strut_table {
+  margin: 10px;
+  border-collapse: collapse;
+  width:auto;
+  border: 1px solid black;
+
+  th {
+    border: 1px solid black;
+    padding: 4px;
+    background-color: lightgray;
+  }
+  th.sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  th.sortable:hover {
+    background-color: #b0b0b0;
+  }
+  th.sortable[data-sort-dir="asc"]::after { content: " ▲"; }
+  th.sortable[data-sort-dir="desc"]::after { content: " ▼"; }
+  tr {
+    border-bottom: 1px solid black;
+  }
+  td {
+    border: 1px solid black;
+    padding: 4px;
+  }
+}
+
 .hub {
   stroke: black;
   stroke-width: 4px;
@@ -90,7 +125,7 @@ table {
   margin-top:10px;
 }
 #legend {
-  position: fixed;
+  position: absolute;
   left: 20px;
   top: 20px;
   transform-origin: top left;
@@ -123,6 +158,12 @@ table {
     <div id="stats"></div>
     <div id="element_info"></div>
   </div>
+</div>
+<div id="strut_list">
+  <h3>Strut List</h3>
+  <table id="strut_table">
+    <tr><th>Checked</th><th class="sortable" onclick="sortStrutTable(1, true)">ID</th><th class="sortable" onclick="sortStrutTable(2, false)">Type</th><th>Length</th><th>Drawing</th></tr>
+  </table>
 </div>
 <script>
 
@@ -576,6 +617,7 @@ wiring_stats = {
   "powered_hubs": 0,
 }
 
+debugInfoEnabled = false;
 
 const CENTER = [650, 650];
 const TWO_PI = 2 * Math.PI;
@@ -635,20 +677,8 @@ function arrowhead(x, y, angle_deg, color) {
   return path;
 }
 
-function showStrutInfo(index) {
+function drawStrutSvg(svg, index) {
   var strut = struts[index];
-  var info = `<h2 id="strut-title">Strut ${index}</h2>
-    <table>
-    <tr><th>Tier</th><td>${strut.tier}</td></tr>
-    <tr><th>Type</th><td>${strut.type}</td></tr>
-    <tr><th>Length</th><td>${strut.length}</td></tr>
-    <tr><th>Original Length</th><td>${strut.original_length}</td></tr>
-    </table>
-    <svg id="strut_svg" width="400" height="100"></svg>
-    <pre>${debugInfoEnabled ? JSON.stringify(strut, null, 2) : ""}</pre>`;
-  var el = document.getElementById("element_info");
-  el.innerHTML = info;
-  var svg = document.getElementById("strut_svg");
   // add rectangle representing strut
   var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
   rect.setAttribute("x", 100);
@@ -770,6 +800,10 @@ function showStrutInfo(index) {
   for (i in [0, 1]) {
     var edge = strut.edges[i];
     var other_edge = strut.edges[(i+1)%2];
+    if (edge == undefined) {
+      continue;
+    }
+
     if (edge.peers.end && edge.peers.end.strut == strut.ix) {
       // connects to other strip on same strut
       // green cubic bezier to self
@@ -857,6 +891,22 @@ function showStrutInfo(index) {
     }
     top = !top;
   }
+}
+
+function showStrutInfo(index) {
+  var strut = struts[index];
+  var info = `<h2 id="strut-title">Strut ${index}</h2>
+    <table>
+    <tr><th>Tier</th><td>${strut.tier}</td></tr>
+    <tr><th>Type</th><td>${strut.type}</td></tr>
+    <tr><th>Length</th><td>${strut.length}</td></tr>
+    <tr><th>Original Length</th><td>${strut.original_length}</td></tr>
+    </table>
+    <svg id="strut_svg" width="400" height="100"></svg>
+    <pre>${debugInfoEnabled ? JSON.stringify(strut, null, 2) : ""}</pre>`;
+  var el = document.getElementById("element_info");
+  el.innerHTML = info;
+  drawStrutSvg(document.getElementById("strut_svg"), index);
 }
 
 function showTriangleInfo(index) {
@@ -1525,6 +1575,66 @@ for (hub in hubs) {
   }
 }
 
+// now create a list with all the struts
+const strutTable = document.getElementById("strut_table");
+for (const strut of struts) {
+  const row = document.createElement("tr");
+
+  const checkboxCell = document.createElement("td");
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = localStorage.getItem(`strut-${strut.ix}-checked`) == "true"; // default to false
+  checkbox.addEventListener("change", function() {
+    const strutLines = svg.querySelectorAll(`[data-strut-index="${strut.ix}"]`);
+    localStorage.setItem(`strut-${strut.ix}-checked`, this.checked);
+  });
+  checkboxCell.appendChild(checkbox);
+  row.appendChild(checkboxCell);
+
+  const indexCell = document.createElement("td");
+  indexCell.textContent = strut.ix;
+  row.appendChild(indexCell);
+
+  const typeCell = document.createElement("td");
+  typeCell.textContent = strut.type;
+  row.appendChild(typeCell);
+
+  const lengthCell = document.createElement("td");
+  lengthCell.textContent = strut.length.toFixed(2);
+  row.appendChild(lengthCell);
+
+  const drawingCell = document.createElement("td");
+  const drawing = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  drawing.setAttribute("width", "300");
+  drawing.setAttribute("height", "75");
+  drawing.setAttribute("viewBox", "0 0 400 100");
+  drawStrutSvg(drawing, strut.ix);
+  drawingCell.appendChild(drawing);
+  row.appendChild(drawingCell);
+
+  strutTable.appendChild(row);
+}
+
+function sortStrutTable(colIndex, numeric) {
+  const table = document.getElementById("strut_table");
+  const rows = Array.from(table.rows).slice(1);
+  const headerCell = table.rows[0].cells[colIndex];
+  const asc = headerCell.dataset.sortDir !== "asc";
+  for (const th of table.rows[0].cells) {
+    delete th.dataset.sortDir;
+  }
+  headerCell.dataset.sortDir = asc ? "asc" : "desc";
+  rows.sort((a, b) => {
+    const aVal = a.cells[colIndex].textContent;
+    const bVal = b.cells[colIndex].textContent;
+    const cmp = numeric ? Number(aVal) - Number(bVal) : aVal.localeCompare(bVal);
+    return asc ? cmp : -cmp;
+  });
+  for (const row of rows) {
+    table.appendChild(row);
+  }
+}
+
 // Scale the legend and sidebar proportionally with the SVG (SVG is 1300×1300 logical units)
 const svgScale = Math.min(window.innerWidth, window.innerHeight) / 1300;
 document.getElementById('legend').style.transform = `scale(${svgScale})`;
@@ -1575,7 +1685,6 @@ function setTriangleFillOpacity(enabled) {
   });
 })();
 
-debugInfoEnabled = false;
 (function initDebugInfoToggle() {
   const toggle = document.getElementById("toggle-debug-info");
   if (!toggle) return;
