@@ -162,7 +162,7 @@ table#strut_table {
 <div id="strut_list">
   <h3>Strut List</h3>
   <table id="strut_table">
-    <tr><th>Checked</th><th class="sortable" onclick="sortStrutTable(1, true)">ID</th><th class="sortable" onclick="sortStrutTable(2, false)">Type</th><th>Length</th><th>Drawing</th></tr>
+    <tr><th>Labelled</th><th>Soldered - JST</th><th>Soldered - P&amp;L</th><th>Complete</th><th class="sortable" onclick="sortStrutTable(4, true)">ID</th><th class="sortable" onclick="sortStrutTable(5, false)">Type</th><th>Length</th><th>Drawing</th></tr>
   </table>
 </div>
 <script>
@@ -1580,16 +1580,18 @@ const strutTable = document.getElementById("strut_table");
 for (const strut of struts) {
   const row = document.createElement("tr");
 
-  const checkboxCell = document.createElement("td");
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = localStorage.getItem(`strut-${strut.ix}-checked`) == "true"; // default to false
-  checkbox.addEventListener("change", function() {
-    const strutLines = svg.querySelectorAll(`[data-strut-index="${strut.ix}"]`);
-    localStorage.setItem(`strut-${strut.ix}-checked`, this.checked);
-  });
-  checkboxCell.appendChild(checkbox);
-  row.appendChild(checkboxCell);
+  const checks = ["labelled", "soldered-jst", "soldered-pnl", "complete"];
+  for (const check of checks) {
+    const checkboxCell = document.createElement("td");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = localStorage.getItem(`strut-${strut.ix}-${check}`) === "true";
+    checkbox.addEventListener("change", function() {
+      localStorage.setItem(`strut-${strut.ix}-${check}`, this.checked);
+    });
+    checkboxCell.appendChild(checkbox);
+    row.appendChild(checkboxCell);
+  }
 
   const indexCell = document.createElement("td");
   indexCell.textContent = strut.ix;
