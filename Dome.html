@@ -162,7 +162,7 @@ table#strut_table {
 <div id="strut_list">
   <h3>Strut List</h3>
   <table id="strut_table">
-    <tr><th>Labelled</th><th>Soldered - JST</th><th>Soldered - P&amp;L</th><th>Complete</th><th class="sortable" onclick="sortStrutTable(4, true)">ID</th><th class="sortable" onclick="sortStrutTable(5, false)">Type</th><th>Length</th><th>Drawing</th></tr>
+    <tr><th>Labelled</th><th>Soldered - JST</th><th>Soldered - P&amp;L</th><th>Complete</th><th class="sortable" onclick="sortStrutTable(4, true)">ID</th><th class="sortable" onclick="sortStrutTable(5, false)">Type</th><th>Length</th><th>Drawing</th><th>JSTs</th></tr>
   </table>
 </div>
 <script>
@@ -612,7 +612,8 @@ powered_hubs = [
 wiring_stats = {
   "strip_starts": 0,
   "signal_loops": 0,
-  "jst_links": 0,
+  "male_jst": 0,
+  "female_jst": 0,
   "unpowered_hubs": 0,
   "powered_hubs": 0,
 }
@@ -678,6 +679,10 @@ function arrowhead(x, y, angle_deg, color) {
 }
 
 function drawStrutSvg(svg, index) {
+  var stats = {
+    "male_jst": 0,
+    "female_jst": 0
+  };
   var strut = struts[index];
   // add rectangle representing strut
   var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -844,6 +849,7 @@ function drawStrutSvg(svg, index) {
         line.setAttribute("class", "power-wire");
         svg.appendChild(line);
       }
+      stats.male_jst++;
     }
     if (edge.peers.start && edge.peers.start.strut != strut.ix) {
       // connects to strip on other strut
@@ -865,6 +871,7 @@ function drawStrutSvg(svg, index) {
       text.setAttribute("fill", "green");
       text.textContent = edge.peers.start.strut;
       svg.appendChild(text);
+      stats.female_jst++;
     } 
 
     if (!edge.peers.start) {
@@ -880,6 +887,7 @@ function drawStrutSvg(svg, index) {
       circle.setAttribute("r", 8);
       circle.setAttribute("class", "strip-start");
       svg.appendChild(circle);
+      stats.female_jst++;
     }
 
     if (!edge.peers.end && strut.tier > 0) {
@@ -891,12 +899,13 @@ function drawStrutSvg(svg, index) {
     }
     top = !top;
   }
+  return stats;
 }
 
 function showStrutInfo(index) {
   var strut = struts[index];
   var info = `<h2 id="strut-title">Strut ${index}</h2>
-    <table>
+    <table id="strut_info_table">
     <tr><th>Tier</th><td>${strut.tier}</td></tr>
     <tr><th>Type</th><td>${strut.type}</td></tr>
     <tr><th>Length</th><td>${strut.length}</td></tr>
@@ -906,7 +915,13 @@ function showStrutInfo(index) {
     <pre>${debugInfoEnabled ? JSON.stringify(strut, null, 2) : ""}</pre>`;
   var el = document.getElementById("element_info");
   el.innerHTML = info;
-  drawStrutSvg(document.getElementById("strut_svg"), index);
+  var stats = drawStrutSvg(document.getElementById("strut_svg"), index);
+  // append rows to table above
+  var rows = `
+    <tr><th>Male JST</th><td>${stats.male_jst}</td></tr>
+    <tr><th>Female JST</th><td>${stats.female_jst}</td></tr>
+  `;
+  el.querySelector("#strut_info_table").innerHTML += rows;
 }
 
 function showTriangleInfo(index) {
@@ -1513,8 +1528,6 @@ for (strut of struts) {
 
           if (connecting_strut.ix == strut.ix) {
             wiring_stats.signal_loops++;
-          } else {
-            wiring_stats.jst_links++;
           }
 
           var wire_end = connecting_strut.led_strips[j].start;
@@ -1610,9 +1623,14 @@ for (const strut of struts) {
   drawing.setAttribute("width", "300");
   drawing.setAttribute("height", "75");
   drawing.setAttribute("viewBox", "0 0 400 100");
-  drawStrutSvg(drawing, strut.ix);
+  var stats = drawStrutSvg(drawing, strut.ix);
   drawingCell.appendChild(drawing);
   row.appendChild(drawingCell);
+  wiring_stats.male_jst += stats.male_jst;
+  wiring_stats.female_jst += stats.female_jst;
+  const jsts = document.createElement("td");
+  jsts.innerHTML = `M: ${stats.male_jst}<br>F: ${stats.female_jst}`;
+  row.appendChild(jsts);
 
   strutTable.appendChild(row);
 }
@@ -1652,7 +1670,8 @@ stats = document.getElementById("stats");
 stats.innerHTML = `<h2>Wiring Stats</h2>
 <table>
 <tr><th>Strip Starts</th><td>${wiring_stats.strip_starts}</td></tr>
-<tr><th>JST Links</th><td>${wiring_stats.jst_links}</td></tr>
+<tr><th>Female JST</th><td>${wiring_stats.female_jst}</td></tr>
+<tr><th>Male JST</th><td>${wiring_stats.male_jst}</td></tr>
 <tr><th>Signal Loops</th><td>${wiring_stats.signal_loops}</td></tr>
 <tr><th>Powered Hubs</th><td>${wiring_stats.powered_hubs}</td></tr>
 <tr><th>Unpowered Hubs</th><td>${wiring_stats.unpowered_hubs}</td></tr>
